@@ -1,0 +1,44 @@
+# .NET / Visual Studio
+bin/
+obj/
+*.user
+*.rsuser
+*.suo
+*.cache
+*.pdb
+*.nupkg
+*.snupkg
+
+# Validation / local tooling
+.validation/
+.venv/
+.vs/
+.vscode/
+artifacts/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Local app/config outputs
+**/config.json
+**/machine_request.json
+**/machine_output.json
+**/wapt_bridge_*.json
+**/*probe*.json
+
+# Secrets / certificates / keys
+*.p12
+*.pfx
+*.pem
+*.crt
+*.cer
+*.key
+
+# OS noise
+Thumbs.db
+Desktop.ini

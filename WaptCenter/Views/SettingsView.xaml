@@ -1,0 +1,24 @@
+<UserControl x:Class="WaptCenter.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+    <Grid>
+        <Border Background="#F7FBFF"
+                CornerRadius="16"
+                Padding="24">
+            <StackPanel>
+                <TextBlock Text="{Binding Title}"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Foreground="#1D2940" />
+                <TextBlock Margin="0,12,0,0"
+                           Text="{Binding Summary}"
+                           TextWrapping="Wrap"
+                           FontSize="14"
+                           Foreground="#5E6B84" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>
