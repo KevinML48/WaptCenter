@@ -43,6 +43,24 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="ConnectionMessageStyle" TargetType="TextBlock">
+            <Setter Property="Visibility" Value="Visible" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#2D5B88" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ConnectionTestMessage}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsConnectionSuccessful}" Value="True">
+                    <Setter Property="Foreground" Value="#1F6B3A" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsConnectionSuccessful}" Value="False">
+                    <Setter Property="Foreground" Value="#A03333" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -106,6 +124,17 @@
                           Content="Activer la verification SSL" />
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Width="180"
+                            Height="40"
+                            Margin="0,0,12,0"
+                            Padding="18,10"
+                            Background="#1F5A9A"
+                            BorderThickness="0"
+                            Foreground="White"
+                            FontWeight="SemiBold"
+                            Command="{Binding TestConnectionCommand}"
+                            Content="Tester la connexion .NET" />
+
                     <Button Width="150"
                             Height="40"
                             Padding="18,10"
@@ -120,6 +149,10 @@
                 <TextBlock Margin="0,16,0,0"
                            Style="{StaticResource StatusMessageStyle}"
                            Text="{Binding StatusMessage}" />
+
+                <TextBlock Margin="0,12,0,0"
+                           Style="{StaticResource ConnectionMessageStyle}"
+                           Text="{Binding ConnectionTestMessage}" />
             </StackPanel>
         </Grid>
     </ScrollViewer>

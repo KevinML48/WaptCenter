@@ -12,7 +12,8 @@ public partial class App : Application
 		base.OnStartup(e);
 
 		var configService = new ConfigService();
-		var settingsViewModel = new SettingsViewModel(configService);
+		var waptConnectionService = new WaptConnectionService();
+		var settingsViewModel = new SettingsViewModel(configService, waptConnectionService);
 		var mainViewModel = new MainViewModel(settingsViewModel);
 
 		var mainWindow = new MainWindow
