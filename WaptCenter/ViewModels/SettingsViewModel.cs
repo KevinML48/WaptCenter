@@ -1,6 +1,7 @@
+using System.ComponentModel;
 using System.Threading.Tasks;
-using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using WaptCenter.Models;
 using WaptCenter.Services;
 
@@ -67,24 +68,26 @@ public partial class SettingsViewModel : ObservableObject
         LoadConfig();
     }
 
+    protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+
+        if (IsConfigurationProperty(e.PropertyName))
+        {
+            StatusMessage = string.Empty;
+            ConnectionTestMessage = string.Empty;
+            ConnectionTechnicalDetails = string.Empty;
+            IsConnectionSuccessful = null;
+        }
+    }
+
     [RelayCommand]
     private void Save()
     {
-        var config = new WaptConfig
-        {
-            ServerUrl = ServerUrl,
-            ClientCertPath = ClientCertPath,
-            ClientKeyPath = ClientKeyPath,
-            PemPath = PemPath,
-            Pkcs12Path = Pkcs12Path,
-            CertPassword = CertPassword,
-            CaCertPath = CaCertPath,
-            PythonExecutablePath = PythonExecutablePath,
-            BridgeScriptPath = BridgeScriptPath,
-            VerifySsl = VerifySsl,
-            TimeoutSeconds = TimeoutSeconds <= 0 ? 30 : TimeoutSeconds
-        };
+        var sanitizedTimeout = TimeoutSeconds <= 0 ? 30 : TimeoutSeconds;
+        TimeoutSeconds = sanitizedTimeout;
 
+        var config = BuildCurrentConfig();
         _configService.Save(config);
         StatusMessage = "Configuration enregistree";
     }
@@ -93,24 +96,14 @@ public partial class SettingsViewModel : ObservableObject
     private async Task TestConnectionAsync()
     {
         IsTestingConnection = true;
-        ConnectionTestMessage = "Test .NET en cours...";
+        ConnectionTestMessage = "Test du bridge WAPT en cours...";
         ConnectionTechnicalDetails = string.Empty;
         IsConnectionSuccessful = null;
+        StatusMessage = string.Empty;
 
         try
         {
-            var result = await _waptConnectionService.TestConnectionAsync(new WaptConfig
-            {
-                ServerUrl = ServerUrl,
-            ClientCertPath = ClientCertPath,
-            ClientKeyPath = ClientKeyPath,
-            PemPath = PemPath,
-                Pkcs12Path = Pkcs12Path,
-                CertPassword = CertPassword,
-                CaCertPath = CaCertPath,
-                VerifySsl = VerifySsl,
-                TimeoutSeconds = TimeoutSeconds <= 0 ? 30 : TimeoutSeconds
-            });
+            var result = await _waptConnectionService.TestConnectionAsync(BuildCurrentConfig());
 
             ConnectionTestMessage = result.Message;
             ConnectionTechnicalDetails = result.TechnicalDetails ?? string.Empty;
@@ -146,5 +139,38 @@ public partial class SettingsViewModel : ObservableObject
     private bool CanTestConnection()
     {
         return !IsTestingConnection;
+    }
+
+    private WaptConfig BuildCurrentConfig()
+    {
+        return new WaptConfig
+        {
+            ServerUrl = ServerUrl,
+            ClientCertPath = ClientCertPath,
+            ClientKeyPath = ClientKeyPath,
+            PemPath = PemPath,
+            Pkcs12Path = Pkcs12Path,
+            CertPassword = CertPassword,
+            CaCertPath = CaCertPath,
+            PythonExecutablePath = PythonExecutablePath,
+            BridgeScriptPath = BridgeScriptPath,
+            VerifySsl = VerifySsl,
+            TimeoutSeconds = TimeoutSeconds <= 0 ? 30 : TimeoutSeconds
+        };
+    }
+
+    private static bool IsConfigurationProperty(string? propertyName)
+    {
+        return propertyName is nameof(ServerUrl)
+            or nameof(ClientCertPath)
+            or nameof(ClientKeyPath)
+            or nameof(PemPath)
+            or nameof(Pkcs12Path)
+            or nameof(CertPassword)
+            or nameof(CaCertPath)
+            or nameof(PythonExecutablePath)
+            or nameof(BridgeScriptPath)
+            or nameof(VerifySsl)
+            or nameof(TimeoutSeconds);
     }
 }

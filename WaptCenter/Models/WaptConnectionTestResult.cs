@@ -4,11 +4,11 @@ namespace WaptCenter.Models;
 
 public sealed class WaptConnectionTestResult
 {
-    public bool Success { get; init; }
+    public bool Success { get; set; }
 
-    public string Message { get; init; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
 
-    public string? TechnicalDetails { get; init; }
+    public string? TechnicalDetails { get; set; }
 
-    public HttpStatusCode? StatusCode { get; init; }
+    public HttpStatusCode? StatusCode { get; set; }
 }

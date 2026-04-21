@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:viewModels="clr-namespace:WaptCenter.ViewModels"
-    xmlns:views="clr-namespace:WaptCenter.Views"
+        xmlns:views="clr-namespace:WaptCenter.Views"
         mc:Ignorable="d"
         Title="WaptCenter"
         Width="1100"
@@ -55,7 +55,7 @@
                                Foreground="White"
                                FontSize="28"
                                FontWeight="Bold" />
-                    <TextBlock Text="Shell desktop WAPT"
+                    <TextBlock Text="Preparation locale de la connexion WAPT"
                                Margin="0,8,0,0"
                                TextWrapping="Wrap"
                                Foreground="#C9D3E8"

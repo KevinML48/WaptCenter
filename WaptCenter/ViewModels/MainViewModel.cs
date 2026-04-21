@@ -29,7 +29,7 @@ public partial class MainViewModel : ObservableObject
     {
         CurrentViewModel = _settingsViewModel;
         CurrentSectionTitle = "Configuration locale";
-        CurrentSectionDescription = "Renseignez et sauvegardez les parametres de connexion WAPT sur ce poste.";
+        CurrentSectionDescription = "Renseignez les chemins et parametres utilises par le bridge Python WAPT pour valider le flux reel de chargement.";
     }
 
     [RelayCommand]
@@ -37,6 +37,6 @@ public partial class MainViewModel : ObservableObject
     {
         CurrentViewModel = _packagesViewModel;
         CurrentSectionTitle = "Paquets cd48";
-        CurrentSectionDescription = "Chargez les paquets via le bridge Python WAPT puis filtrez ceux qui commencent par cd48.";
+        CurrentSectionDescription = "Chargez les paquets via le bridge WAPT puis conservez uniquement ceux dont le package_id contient cd48.";
     }
 }
