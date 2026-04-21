@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -9,13 +9,25 @@ namespace WaptCenter.ViewModels;
 
 public partial class PackagesViewModel : ObservableObject
 {
+    private const string FixedPackageFilterValue = "cd48";
+
     private readonly ConfigService _configService;
     private readonly WaptBridgePackageService _waptBridgePackageService;
+
+    public PackagesViewModel(ConfigService configService, WaptBridgePackageService waptBridgePackageService)
+    {
+        _configService = configService;
+        _waptBridgePackageService = waptBridgePackageService;
+    }
 
     public ObservableCollection<WaptPackage> Packages { get; } = [];
 
     [ObservableProperty]
-    private string statusMessage = "Chargez les paquets exposes par le bridge Python WAPT.";
+    [NotifyCanExecuteChangedFor(nameof(LoadPackagesCommand))]
+    private bool isLoadingPackages;
+
+    [ObservableProperty]
+    private string statusMessage = string.Empty;
 
     [ObservableProperty]
     private string technicalDetails = string.Empty;
@@ -24,44 +36,54 @@ public partial class PackagesViewModel : ObservableObject
     private bool isStatusError;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(LoadPackagesCommand))]
-    private bool isLoadingPackages;
-
-    public PackagesViewModel(ConfigService configService, WaptBridgePackageService waptBridgePackageService)
-    {
-        _configService = configService;
-        _waptBridgePackageService = waptBridgePackageService;
-    }
+    private bool hasPackages;
 
     [RelayCommand(CanExecute = nameof(CanLoadPackages))]
     private async Task LoadPackagesAsync()
     {
         IsLoadingPackages = true;
         IsStatusError = false;
+        StatusMessage = string.Empty;
         TechnicalDetails = string.Empty;
-        StatusMessage = "Chargement des paquets cd48 via le bridge Python en cours...";
+        HasPackages = false;
+        Packages.Clear();
 
         try
         {
-            var packages = await _waptBridgePackageService.GetCd48PackagesAsync(_configService.Load());
-            Packages.Clear();
+            var config = _configService.Load();
+            var packages = await _waptBridgePackageService.GetCd48PackagesAsync(config);
+            TechnicalDetails = _waptBridgePackageService.LastTechnicalDetails;
 
             foreach (var package in packages)
             {
                 Packages.Add(package);
             }
 
-            TechnicalDetails = _waptBridgePackageService.LastTechnicalDetails;
+            HasPackages = Packages.Count > 0;
 
-            StatusMessage = packages.Count == 0
-                ? "Aucun paquet cd48 trouve via le bridge Python."
-                : $"{packages.Count} paquet(s) cd48 charge(s) via le bridge Python.";
+            if (!HasPackages)
+            {
+                StatusMessage = $"Aucun paquet dont package_id contient '{FixedPackageFilterValue}' n'a ete trouve.";
+                return;
+            }
+
+            StatusMessage = $"{Packages.Count} paquet(s) dont package_id contient '{FixedPackageFilterValue}' charge(s).";
+        }
+        catch (InvalidOperationException exception)
+        {
+            IsStatusError = true;
+            StatusMessage = exception.Message;
+            TechnicalDetails = string.IsNullOrWhiteSpace(_waptBridgePackageService.LastTechnicalDetails)
+                ? exception.ToString()
+                : _waptBridgePackageService.LastTechnicalDetails;
         }
         catch (Exception exception)
         {
             IsStatusError = true;
-            TechnicalDetails = _waptBridgePackageService.LastTechnicalDetails;
-            StatusMessage = $"Chargement bridge impossible: {exception.Message}";
+            StatusMessage = "Une erreur inattendue est survenue lors du chargement des paquets.";
+            TechnicalDetails = string.IsNullOrWhiteSpace(_waptBridgePackageService.LastTechnicalDetails)
+                ? exception.ToString()
+                : _waptBridgePackageService.LastTechnicalDetails;
         }
         finally
         {
