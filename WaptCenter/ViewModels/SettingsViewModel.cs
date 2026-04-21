@@ -15,6 +15,15 @@ public partial class SettingsViewModel : ObservableObject
     private string serverUrl = string.Empty;
 
     [ObservableProperty]
+    private string clientCertPath = string.Empty;
+
+    [ObservableProperty]
+    private string clientKeyPath = string.Empty;
+
+    [ObservableProperty]
+    private string pemPath = string.Empty;
+
+    [ObservableProperty]
     private string pkcs12Path = string.Empty;
 
     [ObservableProperty]
@@ -36,6 +45,9 @@ public partial class SettingsViewModel : ObservableObject
     private string connectionTestMessage = string.Empty;
 
     [ObservableProperty]
+    private string connectionTechnicalDetails = string.Empty;
+
+    [ObservableProperty]
     private bool? isConnectionSuccessful;
 
     [ObservableProperty]
@@ -55,6 +67,9 @@ public partial class SettingsViewModel : ObservableObject
         var config = new WaptConfig
         {
             ServerUrl = ServerUrl,
+            ClientCertPath = ClientCertPath,
+            ClientKeyPath = ClientKeyPath,
+            PemPath = PemPath,
             Pkcs12Path = Pkcs12Path,
             CertPassword = CertPassword,
             CaCertPath = CaCertPath,
@@ -71,6 +86,7 @@ public partial class SettingsViewModel : ObservableObject
     {
         IsTestingConnection = true;
         ConnectionTestMessage = "Test .NET en cours...";
+        ConnectionTechnicalDetails = string.Empty;
         IsConnectionSuccessful = null;
 
         try
@@ -78,6 +94,9 @@ public partial class SettingsViewModel : ObservableObject
             var result = await _waptConnectionService.TestConnectionAsync(new WaptConfig
             {
                 ServerUrl = ServerUrl,
+            ClientCertPath = ClientCertPath,
+            ClientKeyPath = ClientKeyPath,
+            PemPath = PemPath,
                 Pkcs12Path = Pkcs12Path,
                 CertPassword = CertPassword,
                 CaCertPath = CaCertPath,
@@ -86,6 +105,7 @@ public partial class SettingsViewModel : ObservableObject
             });
 
             ConnectionTestMessage = result.Message;
+            ConnectionTechnicalDetails = result.TechnicalDetails ?? string.Empty;
             IsConnectionSuccessful = result.Success;
         }
         finally
@@ -99,6 +119,9 @@ public partial class SettingsViewModel : ObservableObject
         var config = _configService.Load();
 
         ServerUrl = config.ServerUrl;
+        ClientCertPath = config.ClientCertPath;
+        ClientKeyPath = config.ClientKeyPath;
+        PemPath = config.PemPath;
         Pkcs12Path = config.Pkcs12Path;
         CertPassword = config.CertPassword;
         CaCertPath = config.CaCertPath;
@@ -106,6 +129,7 @@ public partial class SettingsViewModel : ObservableObject
         TimeoutSeconds = config.TimeoutSeconds <= 0 ? 30 : config.TimeoutSeconds;
         StatusMessage = string.Empty;
         ConnectionTestMessage = string.Empty;
+        ConnectionTechnicalDetails = string.Empty;
         IsConnectionSuccessful = null;
     }
 

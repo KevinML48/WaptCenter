@@ -61,6 +61,19 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="ConnectionTechnicalDetailsStyle" TargetType="TextBlock">
+            <Setter Property="Visibility" Value="Visible" />
+            <Setter Property="Margin" Value="0,10,0,0" />
+            <Setter Property="Foreground" Value="#5E6B84" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ConnectionTechnicalDetails}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -94,28 +107,43 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="URL du serveur WAPT" />
                 <TextBox Grid.Row="0" Grid.Column="1"
                          Text="{Binding ServerUrl, UpdateSourceTrigger=PropertyChanged}" />
 
-                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Certificat PKCS12 (.p12 / .pfx)" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Certificat client (.crt ou .pem)" />
                 <TextBox Grid.Row="1" Grid.Column="1"
+                         Text="{Binding ClientCertPath, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Cle privee PEM optionnelle" />
+                <TextBox Grid.Row="2" Grid.Column="1"
+                         Text="{Binding ClientKeyPath, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Fichier PEM (prioritaire sur PKCS12)" />
+                <TextBox Grid.Row="3" Grid.Column="1"
+                         Text="{Binding PemPath, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Certificat PKCS12 (.p12 / .pfx)" />
+                <TextBox Grid.Row="4" Grid.Column="1"
                          Text="{Binding Pkcs12Path, UpdateSourceTrigger=PropertyChanged}" />
 
-                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Mot de passe du certificat" />
+                <TextBlock Grid.Row="5" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Mot de passe du certificat" />
                 <PasswordBox x:Name="CertPasswordBox"
-                             Grid.Row="2"
+                             Grid.Row="5"
                              Grid.Column="1"
                              PasswordChanged="CertPasswordBox_OnPasswordChanged" />
 
-                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Certificat serveur attendu" />
-                <TextBox Grid.Row="3" Grid.Column="1"
+                <TextBlock Grid.Row="6" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Certificat serveur attendu" />
+                <TextBox Grid.Row="6" Grid.Column="1"
                          Text="{Binding CaCertPath, UpdateSourceTrigger=PropertyChanged}" />
 
-                <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Timeout (secondes)" />
-                <TextBox Grid.Row="4" Grid.Column="1"
+                <TextBlock Grid.Row="7" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Timeout (secondes)" />
+                <TextBox Grid.Row="7" Grid.Column="1"
                          Text="{Binding TimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
             </Grid>
 
@@ -153,6 +181,9 @@
                 <TextBlock Margin="0,12,0,0"
                            Style="{StaticResource ConnectionMessageStyle}"
                            Text="{Binding ConnectionTestMessage}" />
+
+                <TextBlock Style="{StaticResource ConnectionTechnicalDetailsStyle}"
+                           Text="{Binding ConnectionTechnicalDetails}" />
             </StackPanel>
         </Grid>
     </ScrollViewer>
