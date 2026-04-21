@@ -17,6 +17,14 @@
       <Link>WaptBridge\scripts\wapt_packages_bridge.py</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\WaptCenter.WaptBridge\scripts\wapt_local_service_machine_helper.py">
+      <Link>WaptBridge\scripts\wapt_local_service_machine_helper.py</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\WaptCenter.WaptBridge\scripts\install_wapt_machine_context_task.ps1">
+      <Link>WaptBridge\scripts\install_wapt_machine_context_task.ps1</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>
