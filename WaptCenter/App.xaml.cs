@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using WaptCenter.Services;
 using WaptCenter.ViewModels;
 using WaptCenter.Views;
 
@@ -10,7 +11,8 @@ public partial class App : Application
 	{
 		base.OnStartup(e);
 
-		var settingsViewModel = new SettingsViewModel();
+		var configService = new ConfigService();
+		var settingsViewModel = new SettingsViewModel(configService);
 		var mainViewModel = new MainViewModel(settingsViewModel);
 
 		var mainWindow = new MainWindow

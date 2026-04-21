@@ -26,7 +26,7 @@ public partial class MainViewModel : ObservableObject
     private void ShowSettings()
     {
         CurrentViewModel = _settingsViewModel;
-        CurrentSectionTitle = "Configuration";
-        CurrentSectionDescription = "Base WPF/MVVM initiale pour preparer l'integration WAPT.";
+        CurrentSectionTitle = "Configuration locale";
+        CurrentSectionDescription = "Renseignez et sauvegardez les parametres de connexion WAPT sur ce poste.";
     }
 }
