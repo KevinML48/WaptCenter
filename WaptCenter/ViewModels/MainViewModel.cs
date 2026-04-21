@@ -37,6 +37,6 @@ public partial class MainViewModel : ObservableObject
     {
         CurrentViewModel = _packagesViewModel;
         CurrentSectionTitle = "Paquets cd48";
-        CurrentSectionDescription = "Chargez les paquets exposes par l'API WAPT puis filtrez ceux qui commencent par cd48.";
+        CurrentSectionDescription = "Chargez les paquets via le bridge Python WAPT puis filtrez ceux qui commencent par cd48.";
     }
 }

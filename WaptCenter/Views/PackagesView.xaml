@@ -4,6 +4,39 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d">
+    <UserControl.Resources>
+        <Style x:Key="PackagesStatusTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#38506D" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsStatusError}" Value="True">
+                    <Setter Property="Foreground" Value="#A03333" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PackagesTechnicalDetailsStyle" TargetType="TextBox">
+            <Setter Property="Visibility" Value="Visible" />
+            <Setter Property="Margin" Value="0,14,0,0" />
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="AcceptsReturn" Value="True" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="BorderBrush" Value="#D9E0EA" />
+            <Setter Property="Background" Value="#F7FBFF" />
+            <Setter Property="Foreground" Value="#41546D" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="MinHeight" Value="90" />
+            <Setter Property="MaxHeight" Value="180" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding TechnicalDetails}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -16,7 +49,7 @@
                        FontSize="22"
                        FontWeight="Bold"
                        Foreground="#1D2940" />
-            <TextBlock Text="Chargement direct via l'API WAPT en .NET, puis filtrage initial sur le nom des paquets cd48."
+            <TextBlock Text="Chargement via un bridge Python WAPT qui retourne du JSON a l'application desktop."
                        Margin="0,8,0,0"
                        TextWrapping="Wrap"
                        Foreground="#5E6B84"
@@ -36,9 +69,11 @@
                     Content="Charger les paquets" />
 
             <TextBlock Margin="0,14,0,0"
-                       TextWrapping="Wrap"
-                       Foreground="#38506D"
+                       Style="{StaticResource PackagesStatusTextStyle}"
                        Text="{Binding StatusMessage}" />
+
+            <TextBox Style="{StaticResource PackagesTechnicalDetailsStyle}"
+                     Text="{Binding TechnicalDetails}" />
         </StackPanel>
 
         <DataGrid Grid.Row="2"

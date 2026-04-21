@@ -16,6 +16,10 @@ public sealed class WaptConfig
 
     public string CaCertPath { get; set; } = string.Empty;
 
+    public string PythonExecutablePath { get; set; } = string.Empty;
+
+    public string BridgeScriptPath { get; set; } = string.Empty;
+
     public bool VerifySsl { get; set; } = true;
 
     public int TimeoutSeconds { get; set; } = 30;

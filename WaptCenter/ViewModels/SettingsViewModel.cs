@@ -33,6 +33,12 @@ public partial class SettingsViewModel : ObservableObject
     private string caCertPath = string.Empty;
 
     [ObservableProperty]
+    private string pythonExecutablePath = string.Empty;
+
+    [ObservableProperty]
+    private string bridgeScriptPath = string.Empty;
+
+    [ObservableProperty]
     private bool verifySsl = true;
 
     [ObservableProperty]
@@ -73,6 +79,8 @@ public partial class SettingsViewModel : ObservableObject
             Pkcs12Path = Pkcs12Path,
             CertPassword = CertPassword,
             CaCertPath = CaCertPath,
+            PythonExecutablePath = PythonExecutablePath,
+            BridgeScriptPath = BridgeScriptPath,
             VerifySsl = VerifySsl,
             TimeoutSeconds = TimeoutSeconds <= 0 ? 30 : TimeoutSeconds
         };
@@ -125,6 +133,8 @@ public partial class SettingsViewModel : ObservableObject
         Pkcs12Path = config.Pkcs12Path;
         CertPassword = config.CertPassword;
         CaCertPath = config.CaCertPath;
+        PythonExecutablePath = config.PythonExecutablePath;
+        BridgeScriptPath = config.BridgeScriptPath;
         VerifySsl = config.VerifySsl;
         TimeoutSeconds = config.TimeoutSeconds <= 0 ? 30 : config.TimeoutSeconds;
         StatusMessage = string.Empty;

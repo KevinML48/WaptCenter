@@ -110,6 +110,8 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="URL du serveur WAPT" />
@@ -145,6 +147,14 @@
                 <TextBlock Grid.Row="7" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Timeout (secondes)" />
                 <TextBox Grid.Row="7" Grid.Column="1"
                          Text="{Binding TimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Grid.Row="8" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Python executable" />
+                <TextBox Grid.Row="8" Grid.Column="1"
+                         Text="{Binding PythonExecutablePath, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Grid.Row="9" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Script bridge Python" />
+                <TextBox Grid.Row="9" Grid.Column="1"
+                         Text="{Binding BridgeScriptPath, UpdateSourceTrigger=PropertyChanged}" />
             </Grid>
 
             <StackPanel Grid.Row="2" Margin="0,20,0,0">
