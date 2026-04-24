@@ -18,6 +18,10 @@
             <views:SettingsView />
         </DataTemplate>
 
+        <DataTemplate DataType="{x:Type viewModels:DashboardViewModel}">
+            <views:DashboardView />
+        </DataTemplate>
+
         <DataTemplate DataType="{x:Type viewModels:PackagesViewModel}">
             <views:PackagesView />
         </DataTemplate>
@@ -63,6 +67,10 @@
                 </StackPanel>
 
                 <StackPanel Grid.Row="1" Margin="0,32,0,0" VerticalAlignment="Top">
+                    <Button Style="{StaticResource SidebarButtonStyle}"
+                        Command="{Binding ShowDashboardCommand}"
+                        Content="Tableau de bord" />
+
                     <Button Style="{StaticResource SidebarButtonStyle}"
                         Command="{Binding ShowSettingsCommand}"
                         Content="Parametres" />
