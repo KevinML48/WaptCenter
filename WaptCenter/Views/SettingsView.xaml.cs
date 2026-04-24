@@ -17,6 +17,7 @@ public partial class SettingsView : UserControl
         if (e.NewValue is SettingsViewModel viewModel)
         {
             CertPasswordBox.Password = viewModel.CertPassword;
+            ServerPasswordBox.Password = viewModel.ServerPassword;
         }
     }
 
@@ -25,6 +26,14 @@ public partial class SettingsView : UserControl
         if (DataContext is SettingsViewModel viewModel && viewModel.CertPassword != CertPasswordBox.Password)
         {
             viewModel.CertPassword = CertPasswordBox.Password;
+        }
+    }
+
+    private void ServerPasswordBox_OnPasswordChanged(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is SettingsViewModel viewModel && viewModel.ServerPassword != ServerPasswordBox.Password)
+        {
+            viewModel.ServerPassword = ServerPasswordBox.Password;
         }
     }
 }

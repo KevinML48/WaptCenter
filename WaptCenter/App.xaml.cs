@@ -13,9 +13,11 @@ public partial class App : Application
 
 		var configService = new ConfigService();
 		var waptBridgePackageService = new WaptBridgePackageService();
+		var waptBridgeMachineService = new WaptBridgeMachineService();
 		var waptConnectionService = new WaptConnectionService(waptBridgePackageService);
 		var settingsViewModel = new SettingsViewModel(configService, waptConnectionService);
-		var packagesViewModel = new PackagesViewModel(configService, waptBridgePackageService);
+		var packageDetailsViewModel = new PackageDetailsViewModel(configService, waptBridgeMachineService);
+		var packagesViewModel = new PackagesViewModel(configService, waptBridgePackageService, packageDetailsViewModel);
 		var mainViewModel = new MainViewModel(settingsViewModel, packagesViewModel);
 
 		var mainWindow = new MainWindow

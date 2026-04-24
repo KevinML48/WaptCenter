@@ -4,6 +4,10 @@ public sealed class WaptConfig
 {
     public string ServerUrl { get; set; } = string.Empty;
 
+    public string ServerUser { get; set; } = string.Empty;
+
+    public string ServerPassword { get; set; } = string.Empty;
+
     public string ClientCertPath { get; set; } = string.Empty;
 
     public string ClientKeyPath { get; set; } = string.Empty;

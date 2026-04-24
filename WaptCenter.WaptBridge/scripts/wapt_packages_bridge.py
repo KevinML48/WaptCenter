@@ -41,6 +41,11 @@ LOCAL_SERVICE_MACHINE_BRIDGE_DIR = (
 )
 FILTER_FIELD_USED = "package_id"
 FILTER_MODE_USED = "contains"
+MIN_UPDATE_TIMEOUT_SECONDS = 120
+UPDATE_TIMEOUT_MULTIPLIER = 3
+UPDATE_TIMEOUT_MESSAGE = (
+    "La mise a jour de l'index WAPT a depasse le delai autorise. Augmentez le timeout."
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -65,12 +70,19 @@ def main() -> int:
     return 0 if response["success"] else 1
 
 
+def resolve_update_timeout_seconds(configured_timeout_seconds: int) -> int:
+    safe_timeout_seconds = max(1, configured_timeout_seconds)
+    return max(MIN_UPDATE_TIMEOUT_SECONDS, safe_timeout_seconds * UPDATE_TIMEOUT_MULTIPLIER)
+
+
 def execute_bridge(args: argparse.Namespace) -> dict:
     technical_details: list[str] = []
 
     try:
         wapt_get_executable = resolve_wapt_get_executable()
         repo_url = build_repo_url(args.server_url)
+        configured_timeout_seconds = max(1, args.timeout)
+        update_timeout_seconds = resolve_update_timeout_seconds(configured_timeout_seconds)
 
         technical_details.append(
             "Strategy: native WAPT bridge (update -> LocalServiceMachineContext -> LocalServiceCatalog -> LocalServiceBearer -> WaptRemoteRepo -> local-request -> search fallbacks)"
@@ -94,7 +106,8 @@ def execute_bridge(args: argparse.Namespace) -> dict:
         technical_details.append(
             f"CA certificate: {args.ca_cert if args.ca_cert else '<unchanged from base config>'}"
         )
-        technical_details.append(f"Timeout: {max(1, args.timeout)} second(s)")
+        technical_details.append(f"Timeout configured: {configured_timeout_seconds} second(s)")
+        technical_details.append(f"Timeout used for update: {update_timeout_seconds} second(s)")
         technical_details.append(f"Filter field used: {FILTER_FIELD_USED}")
         technical_details.append(f"Filter mode used: {FILTER_MODE_USED}")
         technical_details.append(f"Filter value used: {args.prefix}")
@@ -132,7 +145,7 @@ def execute_bridge(args: argparse.Namespace) -> dict:
                     wapt_get_executable,
                     config_path,
                     ["update"],
-                    timeout_seconds=max(30, args.timeout * 3),
+                    timeout_seconds=update_timeout_seconds,
                 )
                 technical_details.append(format_command_result("update", update_result))
 
@@ -145,7 +158,11 @@ def execute_bridge(args: argparse.Namespace) -> dict:
                 if not update_result["ok"]:
                     return build_response(
                         success=False,
-                        message="Le client WAPT natif n'a pas pu mettre a jour l'index des paquets.",
+                        message=(
+                            UPDATE_TIMEOUT_MESSAGE
+                            if update_result["timed_out"]
+                            else "Le client WAPT natif n'a pas pu mettre a jour l'index des paquets."
+                        ),
                         packages=[],
                         technical_details=technical_details,
                     )
@@ -584,6 +601,8 @@ def run_wapt_command(
     timeout_seconds: int,
 ) -> dict:
     full_command = [str(wapt_get_executable), "-c", str(config_path), "-j", *command_arguments]
+    effective_timeout_seconds = max(1, timeout_seconds)
+    started_at = time.perf_counter()
 
     try:
         completed = subprocess.run(
@@ -592,10 +611,11 @@ def run_wapt_command(
             text=True,
             encoding=get_preferred_text_encoding(),
             errors="replace",
-            timeout=max(1, timeout_seconds),
+            timeout=effective_timeout_seconds,
             check=False,
         )
     except subprocess.TimeoutExpired as exception:
+        duration_seconds = time.perf_counter() - started_at
         return {
             "command": format_command(full_command),
             "ok": False,
@@ -606,7 +626,11 @@ def run_wapt_command(
             "json_payload": None,
             "parse_error": None,
             "timed_out": True,
+            "timeout_seconds": effective_timeout_seconds,
+            "duration_seconds": duration_seconds,
         }
+
+    duration_seconds = time.perf_counter() - started_at
 
     stdout = (completed.stdout or "").strip()
     stderr = (completed.stderr or "").strip()
@@ -638,6 +662,8 @@ def run_wapt_command(
         "json_payload": json_payload if isinstance(json_payload, dict) else None,
         "parse_error": parse_error,
         "timed_out": False,
+        "timeout_seconds": effective_timeout_seconds,
+        "duration_seconds": duration_seconds,
     }
 
 
@@ -1896,6 +1922,14 @@ def format_command(command: list[str]) -> str:
 
 def format_command_result(label: str, command_result: dict) -> str:
     lines = [f"Command [{label}]: {command_result['command']}"]
+
+    timeout_seconds = command_result.get("timeout_seconds")
+    if timeout_seconds is not None:
+        lines.append(f"Timeout used: {timeout_seconds} second(s)")
+
+    duration_seconds = command_result.get("duration_seconds")
+    if duration_seconds is not None:
+        lines.append(f"Elapsed duration: {duration_seconds:.2f} second(s)")
 
     if command_result["timed_out"]:
         lines.append("Timed out: True")

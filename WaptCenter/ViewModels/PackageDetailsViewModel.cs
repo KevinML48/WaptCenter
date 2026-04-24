@@ -1,0 +1,453 @@
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using WaptCenter.Models;
+using WaptCenter.Services;
+
+namespace WaptCenter.ViewModels;
+
+public partial class PackageDetailsViewModel : ObservableObject
+{
+    private const string AllOuFilterValue = "Toutes les OU";
+
+    private readonly ConfigService _configService;
+    private readonly WaptBridgeMachineService _waptBridgeMachineService;
+    private CancellationTokenSource? _loadMachinesCancellationTokenSource;
+
+    public PackageDetailsViewModel(
+        ConfigService configService,
+        WaptBridgeMachineService waptBridgeMachineService)
+    {
+        _configService = configService;
+        _waptBridgeMachineService = waptBridgeMachineService;
+        ClearSelection();
+    }
+
+    public ObservableCollection<WaptMachine> Machines { get; } = [];
+
+    public ObservableCollection<WaptMachine> FilteredMachines { get; } = [];
+
+    public ObservableCollection<string> AvailableOuFilters { get; } = [];
+
+    public ObservableCollection<string> OuComplianceBreakdownLines { get; } = [];
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ReloadCommand))]
+    private bool isLoadingMachines;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ReloadCommand))]
+    private WaptPackage? selectedPackage;
+
+    [ObservableProperty]
+    private string selectedPackageSummary = "Selectionnez un paquet cd48 pour charger les machines associees.";
+
+    [ObservableProperty]
+    private string statusMessage = "Selectionnez un paquet cd48 pour charger les machines associees.";
+
+    [ObservableProperty]
+    private string technicalDetails = string.Empty;
+
+    [ObservableProperty]
+    private bool isStatusError;
+
+    [ObservableProperty]
+    private bool hasMachines;
+
+    [ObservableProperty]
+    private string matchTypeWarningMessage = string.Empty;
+
+    [ObservableProperty]
+    private bool hasOnlyDependsFallbackMachines;
+
+    [ObservableProperty]
+    private string matchTypeSummaryMessage = string.Empty;
+
+    [ObservableProperty]
+    private string complianceSummaryMessage = string.Empty;
+
+    [ObservableProperty]
+    private string ouSummaryMessage = string.Empty;
+
+    [ObservableProperty]
+    private string selectedOuFilter = AllOuFilterValue;
+
+    [ObservableProperty]
+    private bool hasOuComplianceBreakdown;
+
+    [ObservableProperty]
+    private int visibleMachineCount;
+
+    [ObservableProperty]
+    private int compliantMachineCount;
+
+    [ObservableProperty]
+    private int unknownMachineCount;
+
+    [ObservableProperty]
+    private int nonCompliantMachineCount;
+
+    [RelayCommand(CanExecute = nameof(CanReload))]
+    private async Task ReloadAsync()
+    {
+        await LoadForPackageAsync(SelectedPackage);
+    }
+
+    public void ClearSelection()
+    {
+        CancelPendingLoad();
+        Machines.Clear();
+        SelectedPackage = null;
+        SelectedPackageSummary = "Selectionnez un paquet cd48 pour charger les machines associees.";
+        StatusMessage = "Selectionnez un paquet cd48 pour charger les machines associees.";
+        TechnicalDetails = string.Empty;
+        IsStatusError = false;
+        HasMachines = false;
+        FilteredMachines.Clear();
+        OuComplianceBreakdownLines.Clear();
+        ResetOuFilters();
+        MatchTypeWarningMessage = string.Empty;
+        MatchTypeSummaryMessage = string.Empty;
+        ComplianceSummaryMessage = string.Empty;
+        OuSummaryMessage = string.Empty;
+        HasOuComplianceBreakdown = false;
+        VisibleMachineCount = 0;
+        CompliantMachineCount = 0;
+        UnknownMachineCount = 0;
+        NonCompliantMachineCount = 0;
+        HasOnlyDependsFallbackMachines = false;
+        IsLoadingMachines = false;
+    }
+
+    public async Task LoadForPackageAsync(WaptPackage? package)
+    {
+        CancelPendingLoad();
+        SelectedPackage = package;
+        Machines.Clear();
+        FilteredMachines.Clear();
+        OuComplianceBreakdownLines.Clear();
+        TechnicalDetails = string.Empty;
+        IsStatusError = false;
+        HasMachines = false;
+        ResetOuFilters();
+        MatchTypeWarningMessage = string.Empty;
+        MatchTypeSummaryMessage = string.Empty;
+        ComplianceSummaryMessage = string.Empty;
+        OuSummaryMessage = string.Empty;
+        HasOuComplianceBreakdown = false;
+        VisibleMachineCount = 0;
+        CompliantMachineCount = 0;
+        UnknownMachineCount = 0;
+        NonCompliantMachineCount = 0;
+        HasOnlyDependsFallbackMachines = false;
+
+        if (package is null || string.IsNullOrWhiteSpace(package.PackageId))
+        {
+            SelectedPackageSummary = "Selectionnez un paquet cd48 pour charger les machines associees.";
+            StatusMessage = "Selectionnez un paquet cd48 pour charger les machines associees.";
+            MatchTypeSummaryMessage = string.Empty;
+            ComplianceSummaryMessage = string.Empty;
+            OuSummaryMessage = string.Empty;
+            return;
+        }
+
+        var cancellationTokenSource = new CancellationTokenSource();
+        _loadMachinesCancellationTokenSource = cancellationTokenSource;
+
+        SelectedPackageSummary = BuildPackageSummary(package);
+        StatusMessage = $"Chargement des machines pour '{package.PackageId}'...";
+        IsLoadingMachines = true;
+
+        try
+        {
+            var config = _configService.Load();
+            var machines = await _waptBridgeMachineService.GetMachinesForPackageAsync(
+                config,
+                package.PackageId,
+                cancellationTokenSource.Token);
+
+            if (cancellationTokenSource.IsCancellationRequested)
+            {
+                return;
+            }
+
+            TechnicalDetails = _waptBridgeMachineService.LastTechnicalDetails;
+
+            foreach (var machine in machines)
+            {
+                Machines.Add(machine);
+            }
+
+            UpdateOuFilterOptions(machines);
+            ApplyOuFilter();
+            StatusMessage = HasMachines
+                ? $"{Machines.Count} machine(s) ont ete trouvees pour '{package.PackageId}'."
+                : $"Aucune machine n'a ete trouvee pour '{package.PackageId}'.";
+        }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested)
+        {
+        }
+        catch (InvalidOperationException exception)
+        {
+            if (cancellationTokenSource.IsCancellationRequested)
+            {
+                return;
+            }
+
+            IsStatusError = true;
+            StatusMessage = exception.Message;
+            MatchTypeSummaryMessage = string.Empty;
+            ComplianceSummaryMessage = string.Empty;
+            OuSummaryMessage = string.Empty;
+            HasOuComplianceBreakdown = false;
+            OuComplianceBreakdownLines.Clear();
+            TechnicalDetails = string.IsNullOrWhiteSpace(_waptBridgeMachineService.LastTechnicalDetails)
+                ? exception.ToString()
+                : _waptBridgeMachineService.LastTechnicalDetails;
+        }
+        catch (Exception exception)
+        {
+            if (cancellationTokenSource.IsCancellationRequested)
+            {
+                return;
+            }
+
+            IsStatusError = true;
+            StatusMessage = "Une erreur inattendue est survenue lors du chargement des machines.";
+            MatchTypeSummaryMessage = string.Empty;
+            ComplianceSummaryMessage = string.Empty;
+            OuSummaryMessage = string.Empty;
+            HasOuComplianceBreakdown = false;
+            OuComplianceBreakdownLines.Clear();
+            TechnicalDetails = string.IsNullOrWhiteSpace(_waptBridgeMachineService.LastTechnicalDetails)
+                ? exception.ToString()
+                : _waptBridgeMachineService.LastTechnicalDetails;
+        }
+        finally
+        {
+            if (ReferenceEquals(_loadMachinesCancellationTokenSource, cancellationTokenSource))
+            {
+                _loadMachinesCancellationTokenSource = null;
+                IsLoadingMachines = false;
+            }
+
+            cancellationTokenSource.Dispose();
+        }
+    }
+
+    private bool CanReload()
+    {
+        return !IsLoadingMachines && SelectedPackage is not null;
+    }
+
+    private void CancelPendingLoad()
+    {
+        if (_loadMachinesCancellationTokenSource is null)
+        {
+            return;
+        }
+
+        _loadMachinesCancellationTokenSource.Cancel();
+        _loadMachinesCancellationTokenSource.Dispose();
+        _loadMachinesCancellationTokenSource = null;
+    }
+
+    private static string BuildPackageSummary(WaptPackage package)
+    {
+        if (string.IsNullOrWhiteSpace(package.Name))
+        {
+            return $"Package_id selectionne : {package.PackageId}";
+        }
+
+        return $"Package_id selectionne : {package.PackageId} ({package.Name})";
+    }
+
+    partial void OnSelectedOuFilterChanged(string value)
+    {
+        ApplyOuFilter();
+    }
+
+    private void UpdateMatchTypeWarning(IReadOnlyCollection<WaptMachine> machines)
+    {
+        HasOnlyDependsFallbackMachines = machines.Count > 0 && machines.All(machine => machine.IsDependsFallback);
+        MatchTypeWarningMessage = HasOnlyDependsFallbackMachines
+            ? "Les machines affich\u00E9es sont actuellement d\u00E9duites via les d\u00E9pendances WAPT, car le serveur ne renvoie pas le d\u00E9tail d'installation versionn\u00E9."
+            : string.Empty;
+    }
+
+    private void UpdateMatchTypeSummary(IReadOnlyCollection<WaptMachine> machines)
+    {
+        if (machines.Count == 0)
+        {
+            MatchTypeSummaryMessage = string.Empty;
+            return;
+        }
+
+        var exactInstallCount = machines.Count(machine => machine.IsExactInstall);
+        var dependsFallbackCount = machines.Count(machine => machine.IsDependsFallback);
+
+        MatchTypeSummaryMessage =
+            $"{FormatCount(machines.Count, "machine trouv\u00E9e", "machines trouv\u00E9es")}, " +
+            $"{FormatCount(exactInstallCount, "installation exacte", "installations exactes")}, " +
+            $"{dependsFallbackCount} via d\u00E9pendance / fallback.";
+    }
+
+    private void UpdateComplianceSummary(IReadOnlyCollection<WaptMachine> machines)
+    {
+        VisibleMachineCount = machines.Count;
+        CompliantMachineCount = machines.Count(machine => machine.IsCompliant);
+        UnknownMachineCount = machines.Count(machine => machine.IsComplianceUnknown);
+        NonCompliantMachineCount = machines.Count(machine => machine.IsNonCompliant);
+
+        if (VisibleMachineCount == 0)
+        {
+            ComplianceSummaryMessage = string.Empty;
+            return;
+        }
+
+        var scopeLabel = IsAllOuFilterSelected()
+            ? FormatCount(VisibleMachineCount, "machine", "machines")
+            : FormatCount(VisibleMachineCount, "machine visible", "machines visibles");
+
+        ComplianceSummaryMessage = $"{scopeLabel} : {BuildComplianceBreakdown(CompliantMachineCount, UnknownMachineCount, NonCompliantMachineCount)}.";
+    }
+
+    private void UpdateOuSummary(IReadOnlyCollection<WaptMachine> machines)
+    {
+        if (machines.Count == 0)
+        {
+            OuSummaryMessage = string.Empty;
+            return;
+        }
+
+        var distinctOuCount = machines
+            .Select(machine => machine.OuPath)
+            .Where(ouPath => !string.IsNullOrWhiteSpace(ouPath))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+
+        if (IsAllOuFilterSelected())
+        {
+            OuSummaryMessage = $"{FormatCount(distinctOuCount, "OU distincte trouv\u00E9e", "OU distinctes trouv\u00E9es")}.";
+            return;
+        }
+
+        OuSummaryMessage = $"Filtre OU actif : {SelectedOuFilter}. {FormatCount(distinctOuCount, "OU distincte visible", "OU distinctes visibles")}.";
+    }
+
+    private void UpdateOuComplianceBreakdown(IReadOnlyCollection<WaptMachine> machines)
+    {
+        OuComplianceBreakdownLines.Clear();
+
+        if (machines.Count == 0)
+        {
+            HasOuComplianceBreakdown = false;
+            return;
+        }
+
+        var groupedLines = machines
+            .GroupBy(machine => machine.OuPath, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
+            {
+                var totalCount = group.Count();
+                var compliantCount = group.Count(machine => machine.IsCompliant);
+                var unknownCount = group.Count(machine => machine.IsComplianceUnknown);
+                var nonCompliantCount = group.Count(machine => machine.IsNonCompliant);
+
+                return $"{group.Key} -> {FormatCount(totalCount, "machine", "machines")} ({BuildComplianceBreakdown(compliantCount, unknownCount, nonCompliantCount)})";
+            });
+
+        foreach (var line in groupedLines)
+        {
+            OuComplianceBreakdownLines.Add(line);
+        }
+
+        HasOuComplianceBreakdown = OuComplianceBreakdownLines.Count > 0;
+    }
+
+    private void UpdateOuFilterOptions(IReadOnlyCollection<WaptMachine> machines)
+    {
+        var currentSelection = SelectedOuFilter;
+        var distinctOuPaths = machines
+            .Select(machine => machine.OuPath)
+            .Where(ouPath => !string.IsNullOrWhiteSpace(ouPath))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(ouPath => ouPath, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        AvailableOuFilters.Clear();
+        AvailableOuFilters.Add(AllOuFilterValue);
+
+        foreach (var ouPath in distinctOuPaths)
+        {
+            AvailableOuFilters.Add(ouPath);
+        }
+
+        if (!AvailableOuFilters.Any(filter => string.Equals(filter, currentSelection, StringComparison.OrdinalIgnoreCase)))
+        {
+            SelectedOuFilter = AllOuFilterValue;
+        }
+    }
+
+    private void ResetOuFilters()
+    {
+        AvailableOuFilters.Clear();
+        AvailableOuFilters.Add(AllOuFilterValue);
+        SelectedOuFilter = AllOuFilterValue;
+    }
+
+    private void ApplyOuFilter()
+    {
+        var filteredMachines = Machines
+            .Where(machine => IsAllOuFilterSelected() || string.Equals(machine.OuPath, SelectedOuFilter, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(machine => machine.OuPath, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(machine => machine.OrganizationDisplay, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(machine => machine.Hostname, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        FilteredMachines.Clear();
+        foreach (var machine in filteredMachines)
+        {
+            FilteredMachines.Add(machine);
+        }
+
+        HasMachines = filteredMachines.Count > 0;
+        UpdateMatchTypeSummary(filteredMachines);
+        UpdateComplianceSummary(filteredMachines);
+        UpdateMatchTypeWarning(filteredMachines);
+        UpdateOuSummary(filteredMachines);
+        UpdateOuComplianceBreakdown(filteredMachines);
+    }
+
+    private bool IsAllOuFilterSelected()
+    {
+        return string.IsNullOrWhiteSpace(SelectedOuFilter) ||
+               string.Equals(SelectedOuFilter, AllOuFilterValue, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string FormatCount(int count, string singularLabel, string pluralLabel)
+    {
+        var label = count == 1 ? singularLabel : pluralLabel;
+        return $"{count} {label}";
+    }
+
+    private static string BuildComplianceBreakdown(int compliantCount, int unknownCount, int nonCompliantCount)
+    {
+        var parts = new List<string>
+        {
+            FormatCount(compliantCount, "conforme", "conformes"),
+            FormatCount(unknownCount, "inconnue", "inconnues")
+        };
+
+        if (nonCompliantCount > 0)
+        {
+            parts.Add(FormatCount(nonCompliantCount, "non conforme", "non conformes"));
+        }
+
+        return string.Join(", ", parts);
+    }
+}

@@ -37,6 +37,6 @@ public partial class MainViewModel : ObservableObject
     {
         CurrentViewModel = _packagesViewModel;
         CurrentSectionTitle = "Paquets cd48";
-        CurrentSectionDescription = "Chargez les paquets via le bridge WAPT puis conservez uniquement ceux dont le package_id contient cd48.";
+        CurrentSectionDescription = "Chargez les paquets via le bridge WAPT puis selectionnez un package_id cd48 pour voir les machines associees.";
     }
 }

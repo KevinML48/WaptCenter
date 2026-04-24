@@ -13,14 +13,22 @@ public partial class PackagesViewModel : ObservableObject
 
     private readonly ConfigService _configService;
     private readonly WaptBridgePackageService _waptBridgePackageService;
+    public PackageDetailsViewModel PackageDetails { get; }
 
-    public PackagesViewModel(ConfigService configService, WaptBridgePackageService waptBridgePackageService)
+    public PackagesViewModel(
+        ConfigService configService,
+        WaptBridgePackageService waptBridgePackageService,
+        PackageDetailsViewModel packageDetails)
     {
         _configService = configService;
         _waptBridgePackageService = waptBridgePackageService;
+        PackageDetails = packageDetails;
     }
 
     public ObservableCollection<WaptPackage> Packages { get; } = [];
+
+    [ObservableProperty]
+    private WaptPackage? selectedPackage;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(LoadPackagesCommand))]
@@ -46,6 +54,8 @@ public partial class PackagesViewModel : ObservableObject
         StatusMessage = string.Empty;
         TechnicalDetails = string.Empty;
         HasPackages = false;
+        SelectedPackage = null;
+        PackageDetails.ClearSelection();
         Packages.Clear();
 
         try
@@ -94,5 +104,10 @@ public partial class PackagesViewModel : ObservableObject
     private bool CanLoadPackages()
     {
         return !IsLoadingPackages;
+    }
+
+    partial void OnSelectedPackageChanged(WaptPackage? value)
+    {
+        _ = PackageDetails.LoadForPackageAsync(value);
     }
 }

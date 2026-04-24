@@ -16,24 +16,33 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="PackagesTechnicalDetailsStyle" TargetType="TextBox">
+        <Style x:Key="PackagesTechnicalDetailsExpanderStyle" TargetType="Expander">
             <Setter Property="Visibility" Value="Visible" />
             <Setter Property="Margin" Value="0,14,0,0" />
-            <Setter Property="IsReadOnly" Value="True" />
-            <Setter Property="AcceptsReturn" Value="True" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
-            <Setter Property="BorderBrush" Value="#D9E0EA" />
-            <Setter Property="Background" Value="#F7FBFF" />
-            <Setter Property="Foreground" Value="#41546D" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="MinHeight" Value="90" />
-            <Setter Property="MaxHeight" Value="180" />
+            <Setter Property="IsExpanded" Value="False" />
+            <Setter Property="Foreground" Value="#1D2940" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding TechnicalDetails}" Value="">
                     <Setter Property="Visibility" Value="Collapsed" />
                 </DataTrigger>
             </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PackagesTechnicalDetailsStyle" TargetType="TextBox">
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="AcceptsReturn" Value="True" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+            <Setter Property="Padding" Value="10" />
+            <Setter Property="BorderBrush" Value="#D9E0EA" />
+            <Setter Property="Background" Value="#F7FBFF" />
+            <Setter Property="Foreground" Value="#41546D" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="MinHeight" Value="110" />
+            <Setter Property="MaxHeight" Value="220" />
         </Style>
 
         <Style x:Key="PackagesProgressStyle" TargetType="ProgressBar">
@@ -44,77 +53,456 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="MachineDetailsProgressStyle" TargetType="ProgressBar">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PackageDetails.IsLoadingMachines}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="MachineDetailsStatusTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#38506D" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PackageDetails.IsStatusError}" Value="True">
+                    <Setter Property="Foreground" Value="#A03333" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="MachineDetailsTechnicalDetailsExpanderStyle" TargetType="Expander">
+            <Setter Property="Visibility" Value="Visible" />
+            <Setter Property="Margin" Value="0,12,0,0" />
+            <Setter Property="IsExpanded" Value="False" />
+            <Setter Property="Foreground" Value="#1D2940" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PackageDetails.TechnicalDetails}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="MachineDetailsTechnicalDetailsStyle" TargetType="TextBox">
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="AcceptsReturn" Value="True" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+            <Setter Property="Padding" Value="10" />
+            <Setter Property="BorderBrush" Value="#D9E0EA" />
+            <Setter Property="Background" Value="#FFFDF5" />
+            <Setter Property="Foreground" Value="#41546D" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="MinHeight" Value="110" />
+            <Setter Property="MaxHeight" Value="220" />
+        </Style>
+
+        <Style x:Key="MachineDetailsSummaryTextStyle" TargetType="TextBlock">
+            <Setter Property="Visibility" Value="Visible" />
+            <Setter Property="Margin" Value="0,8,0,0" />
+            <Setter Property="Foreground" Value="#1D2940" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PackageDetails.MatchTypeSummaryMessage}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="MachineDetailsComplianceSummaryTextStyle" TargetType="TextBlock">
+            <Setter Property="Visibility" Value="Visible" />
+            <Setter Property="Margin" Value="0,6,0,0" />
+            <Setter Property="Foreground" Value="#214E35" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PackageDetails.ComplianceSummaryMessage}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="MachineDetailsOuSummaryTextStyle" TargetType="TextBlock">
+            <Setter Property="Visibility" Value="Visible" />
+            <Setter Property="Margin" Value="0,6,0,0" />
+            <Setter Property="Foreground" Value="#41546D" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PackageDetails.OuSummaryMessage}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="MachineDetailsOuBreakdownBorderStyle" TargetType="Border">
+            <Setter Property="Visibility" Value="Visible" />
+            <Setter Property="Margin" Value="0,10,0,0" />
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Background" Value="#F7FBFF" />
+            <Setter Property="BorderBrush" Value="#D9E0EA" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PackageDetails.HasOuComplianceBreakdown}" Value="False">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="MachineDetailsWarningBorderStyle" TargetType="Border">
+            <Setter Property="Visibility" Value="Visible" />
+            <Setter Property="Margin" Value="0,12,0,0" />
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Background" Value="#FFF6DD" />
+            <Setter Property="BorderBrush" Value="#E5C46D" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PackageDetails.MatchTypeWarningMessage}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ReadableDataGridStyle" TargetType="DataGrid">
+            <Setter Property="CanUserAddRows" Value="False" />
+            <Setter Property="CanUserDeleteRows" Value="False" />
+            <Setter Property="CanUserResizeColumns" Value="True" />
+            <Setter Property="CanUserSortColumns" Value="True" />
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="HeadersVisibility" Value="Column" />
+            <Setter Property="RowHeaderWidth" Value="0" />
+            <Setter Property="GridLinesVisibility" Value="Horizontal" />
+            <Setter Property="BorderBrush" Value="#D9E0EA" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Visible" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+            <Setter Property="MinRowHeight" Value="34" />
+        </Style>
     </UserControl.Resources>
 
-    <Grid>
+    <Grid Margin="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
+            <RowDefinition Height="2*" MinHeight="260" />
+            <RowDefinition Height="10" />
+            <RowDefinition Height="3*" MinHeight="360" />
         </Grid.RowDefinitions>
 
-        <StackPanel>
-            <TextBlock Text="Paquets WAPT dont package_id contient cd48"
-                       FontSize="22"
-                       FontWeight="Bold"
-                       Foreground="#1D2940" />
-            <TextBlock Text="Le chargement passe par un bridge Python qui s'appuie sur l'outillage WAPT local, retourne du JSON au desktop, puis conserve uniquement les paquets dont l'identifiant technique package_id contient cd48, sans filtrer sur le nom d'affichage."
-                       Margin="0,8,0,0"
-                       TextWrapping="Wrap"
-                       Foreground="#5E6B84"
-                       FontSize="13" />
-        </StackPanel>
+        <Border Background="#FFFFFF"
+                BorderBrush="#D9E0EA"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="20">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2.2*" />
+                    <ColumnDefinition Width="1.3*" />
+                </Grid.ColumnDefinitions>
 
-        <StackPanel Grid.Row="1" Margin="0,24,0,18">
-            <StackPanel Orientation="Horizontal">
-                <Button Width="180"
-                        Height="40"
-                        Padding="18,10"
-                        Background="#1F5A9A"
-                        BorderThickness="0"
-                        Foreground="White"
-                        FontWeight="SemiBold"
-                        Command="{Binding LoadPackagesCommand}"
-                        Content="Charger les paquets" />
-            </StackPanel>
+                <StackPanel Margin="0,0,24,0">
+                    <TextBlock Text="Paquets WAPT dont package_id contient cd48"
+                               FontSize="22"
+                               FontWeight="Bold"
+                               Foreground="#1D2940" />
+                    <TextBlock Text="Le chargement passe par un bridge Python qui s'appuie sur l'outillage WAPT local, retourne du JSON au desktop, puis conserve uniquement les paquets dont l'identifiant technique package_id contient cd48, sans filtrer sur le nom d'affichage."
+                               Margin="0,8,0,0"
+                               TextWrapping="Wrap"
+                               Foreground="#5E6B84"
+                               FontSize="13" />
+                </StackPanel>
 
-            <ProgressBar Height="6"
-                         Margin="0,14,0,0"
-                         IsIndeterminate="True"
-                         Style="{StaticResource PackagesProgressStyle}" />
+                <StackPanel Grid.Column="1">
+                    <Button Width="180"
+                            Height="40"
+                            Padding="18,10"
+                            HorizontalAlignment="Left"
+                            Background="#1F5A9A"
+                            BorderThickness="0"
+                            Foreground="White"
+                            FontWeight="SemiBold"
+                            Command="{Binding LoadPackagesCommand}"
+                            Content="Charger les paquets" />
 
-            <TextBlock Margin="0,14,0,0"
-                       Style="{StaticResource PackagesStatusTextStyle}"
-                       Text="{Binding StatusMessage}" />
+                    <ProgressBar Height="6"
+                                 Margin="0,14,0,0"
+                                 IsIndeterminate="True"
+                                 Style="{StaticResource PackagesProgressStyle}" />
 
-            <TextBox Style="{StaticResource PackagesTechnicalDetailsStyle}"
-                     Text="{Binding TechnicalDetails}" />
-        </StackPanel>
+                    <TextBlock Margin="0,14,0,0"
+                               Style="{StaticResource PackagesStatusTextStyle}"
+                               Text="{Binding StatusMessage}" />
 
-        <DataGrid Grid.Row="2"
-                  AutoGenerateColumns="False"
-                  CanUserAddRows="False"
-                  CanUserDeleteRows="False"
-                  IsReadOnly="True"
-                  HeadersVisibility="Column"
-                  ItemsSource="{Binding Packages}"
-                  RowHeaderWidth="0"
-                  GridLinesVisibility="Horizontal"
-                  BorderBrush="#D9E0EA"
-                  BorderThickness="1">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Package ID" Binding="{Binding PackageId}" Width="220" />
-                <DataGridTextColumn Header="Nom" Binding="{Binding Name}" Width="180" />
-                <DataGridTextColumn Header="Version" Binding="{Binding Version}" Width="160" />
-                <DataGridTextColumn Header="Maturite" Binding="{Binding Maturity}" Width="120" />
-                <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*">
-                    <DataGridTextColumn.ElementStyle>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="TextWrapping" Value="Wrap" />
-                        </Style>
-                    </DataGridTextColumn.ElementStyle>
-                </DataGridTextColumn>
-            </DataGrid.Columns>
-        </DataGrid>
+                    <Expander Header="Détails techniques"
+                              Style="{StaticResource PackagesTechnicalDetailsExpanderStyle}">
+                        <TextBox Style="{StaticResource PackagesTechnicalDetailsStyle}"
+                                 Text="{Binding TechnicalDetails}" />
+                    </Expander>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1"
+                Margin="0,18,0,0"
+                Background="#FFFFFF"
+                BorderBrush="#D9E0EA"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="16">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <StackPanel>
+                    <TextBlock Text="Liste des paquets"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#1D2940" />
+                    <TextBlock Margin="0,4,0,0"
+                               Text="Sélectionnez un paquet pour afficher les machines associées et les résumés d'inventaire."
+                               Foreground="#5E6B84"
+                               FontSize="13"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+
+                <DataGrid Grid.Row="1"
+                          Margin="0,14,0,0"
+                          MinHeight="240"
+                          Style="{StaticResource ReadableDataGridStyle}"
+                          ItemsSource="{Binding Packages}"
+                          SelectedItem="{Binding SelectedPackage, Mode=TwoWay}"
+                          SelectionMode="Single"
+                          SelectionUnit="FullRow">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="PackageId" Binding="{Binding PackageId}" Width="2*" MinWidth="180" />
+                        <DataGridTextColumn Header="Nom" Binding="{Binding Name}" Width="1.4*" MinWidth="160" />
+                        <DataGridTextColumn Header="Version" Binding="{Binding Version}" Width="140" MinWidth="120" />
+                        <DataGridTextColumn Header="Maturité" Binding="{Binding Maturity}" Width="120" MinWidth="110" />
+                        <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="3*" MinWidth="280">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+        <GridSplitter Grid.Row="2"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Stretch"
+                      Background="#E7EDF5"
+                      ResizeDirection="Rows"
+                      ResizeBehavior="PreviousAndNext"
+                      ShowsPreview="True" />
+
+        <Border Grid.Row="3"
+                Margin="0,18,0,0"
+                Background="#FFFFFF"
+                BorderBrush="#D9E0EA"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="18">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Margin="0,0,24,0">
+                        <TextBlock Text="Machines associées au paquet sélectionné"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="#1D2940" />
+                        <TextBlock Margin="0,6,0,0"
+                                   Text="{Binding PackageDetails.SelectedPackageSummary}"
+                                   Foreground="#5E6B84"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <WrapPanel Grid.Column="1"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Top"
+                               Margin="24,0,0,0">
+                        <Button Width="190"
+                                Height="38"
+                                Padding="16,8"
+                                Background="#255C8D"
+                                BorderThickness="0"
+                                Foreground="White"
+                                FontWeight="SemiBold"
+                                Command="{Binding PackageDetails.ReloadCommand}"
+                                Content="Recharger les machines" />
+
+                        <TextBlock Margin="18,10,8,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="#41546D"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Text="Filtrer par OU" />
+
+                        <ComboBox Width="320"
+                                  Height="38"
+                                  ItemsSource="{Binding PackageDetails.AvailableOuFilters}"
+                                  SelectedItem="{Binding PackageDetails.SelectedOuFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </WrapPanel>
+                </Grid>
+
+                <ProgressBar Grid.Row="1"
+                             Height="6"
+                             Margin="0,16,0,0"
+                             IsIndeterminate="True"
+                             Style="{StaticResource MachineDetailsProgressStyle}" />
+
+                <Grid Grid.Row="2" Margin="0,16,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.4*" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Margin="0,0,18,0">
+                        <TextBlock Style="{StaticResource MachineDetailsStatusTextStyle}"
+                                   Text="{Binding PackageDetails.StatusMessage}" />
+
+                        <TextBlock Style="{StaticResource MachineDetailsComplianceSummaryTextStyle}"
+                                   Text="{Binding PackageDetails.ComplianceSummaryMessage}" />
+
+                        <TextBlock Style="{StaticResource MachineDetailsSummaryTextStyle}"
+                                   Text="{Binding PackageDetails.MatchTypeSummaryMessage}" />
+
+                        <TextBlock Style="{StaticResource MachineDetailsOuSummaryTextStyle}"
+                                   Text="{Binding PackageDetails.OuSummaryMessage}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1">
+                        <Border Style="{StaticResource MachineDetailsOuBreakdownBorderStyle}" Margin="0">
+                            <StackPanel>
+                                <TextBlock Text="Répartition par OU"
+                                           Foreground="#1D2940"
+                                           FontSize="13"
+                                           FontWeight="SemiBold" />
+                                <ScrollViewer MaxHeight="120"
+                                              Margin="0,6,0,0"
+                                              VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsControl ItemsSource="{Binding PackageDetails.OuComplianceBreakdownLines}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Margin="0,0,0,6"
+                                                           Foreground="#41546D"
+                                                           FontSize="12"
+                                                           TextWrapping="Wrap"
+                                                           Text="{Binding}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource MachineDetailsWarningBorderStyle}">
+                            <TextBlock Foreground="#7A5608"
+                                       FontSize="13"
+                                       TextWrapping="Wrap"
+                                       Text="{Binding PackageDetails.MatchTypeWarningMessage}" />
+                        </Border>
+
+                        <Expander Header="Détails techniques"
+                                  Style="{StaticResource MachineDetailsTechnicalDetailsExpanderStyle}">
+                            <TextBox Style="{StaticResource MachineDetailsTechnicalDetailsStyle}"
+                                     Text="{Binding PackageDetails.TechnicalDetails}" />
+                        </Expander>
+                    </StackPanel>
+                </Grid>
+
+                <DataGrid Grid.Row="3"
+                          Margin="0,18,0,0"
+                          MinHeight="300"
+                          Style="{StaticResource ReadableDataGridStyle}"
+                          ItemsSource="{Binding PackageDetails.FilteredMachines}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Hostname" Binding="{Binding Hostname}" Width="1.2*" MinWidth="150" />
+                        <DataGridTextColumn Header="FQDN" Binding="{Binding Fqdn}" Width="1.6*" MinWidth="220" />
+                        <DataGridTextColumn Header="OU / Organisation" Binding="{Binding OrganizationDisplay}" Width="2*" MinWidth="260">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="Version installée" Binding="{Binding InstalledVersion}" Width="150" MinWidth="140" />
+                        <DataGridTextColumn Header="Type de correspondance" Binding="{Binding MatchTypeDisplayLabel}" Width="180" MinWidth="170" />
+                        <DataGridTemplateColumn Header="Statut conformité" Width="170" MinWidth="160">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Padding="10,4"
+                                            CornerRadius="10"
+                                            BorderThickness="1"
+                                            HorizontalAlignment="Left">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="#FFF1D9" />
+                                                <Setter Property="BorderBrush" Value="#D7942D" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ComplianceStatus}" Value="compliant">
+                                                        <Setter Property="Background" Value="#E3F5E7" />
+                                                        <Setter Property="BorderBrush" Value="#5BA46B" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ComplianceStatus}" Value="non_compliant">
+                                                        <Setter Property="Background" Value="#F9E1E1" />
+                                                        <Setter Property="BorderBrush" Value="#C45151" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock FontSize="12"
+                                                   FontWeight="SemiBold"
+                                                   Text="{Binding ComplianceStatusDisplayLabel}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="#8A5A07" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ComplianceStatus}" Value="compliant">
+                                                            <Setter Property="Foreground" Value="#215B34" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding ComplianceStatus}" Value="non_compliant">
+                                                            <Setter Property="Foreground" Value="#922F2F" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Last seen" Binding="{Binding LastSeen}" Width="170" MinWidth="160" />
+                        <DataGridTextColumn Header="Etat hôte" Binding="{Binding Status}" Width="140" MinWidth="130" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>

@@ -16,6 +16,12 @@ public partial class SettingsViewModel : ObservableObject
     private string serverUrl = string.Empty;
 
     [ObservableProperty]
+    private string serverUser = string.Empty;
+
+    [ObservableProperty]
+    private string serverPassword = string.Empty;
+
+    [ObservableProperty]
     private string clientCertPath = string.Empty;
 
     [ObservableProperty]
@@ -120,6 +126,8 @@ public partial class SettingsViewModel : ObservableObject
         var config = _configService.Load();
 
         ServerUrl = config.ServerUrl;
+        ServerUser = config.ServerUser;
+        ServerPassword = config.ServerPassword;
         ClientCertPath = config.ClientCertPath;
         ClientKeyPath = config.ClientKeyPath;
         PemPath = config.PemPath;
@@ -146,6 +154,8 @@ public partial class SettingsViewModel : ObservableObject
         return new WaptConfig
         {
             ServerUrl = ServerUrl,
+            ServerUser = ServerUser,
+            ServerPassword = ServerPassword,
             ClientCertPath = ClientCertPath,
             ClientKeyPath = ClientKeyPath,
             PemPath = PemPath,
@@ -162,6 +172,8 @@ public partial class SettingsViewModel : ObservableObject
     private static bool IsConfigurationProperty(string? propertyName)
     {
         return propertyName is nameof(ServerUrl)
+            or nameof(ServerUser)
+            or nameof(ServerPassword)
             or nameof(ClientCertPath)
             or nameof(ClientKeyPath)
             or nameof(PemPath)

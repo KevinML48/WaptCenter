@@ -144,54 +144,66 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="URL du serveur WAPT" />
                 <TextBox Grid.Row="0" Grid.Column="1"
                          Text="{Binding ServerUrl, UpdateSourceTrigger=PropertyChanged}" />
 
-                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Certificat client (.crt ou .pem)" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Utilisateur serveur WAPT (machines)" />
                 <TextBox Grid.Row="1" Grid.Column="1"
+                         Text="{Binding ServerUser, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Mot de passe serveur WAPT (machines)" />
+                <PasswordBox x:Name="ServerPasswordBox"
+                             Grid.Row="2"
+                             Grid.Column="1"
+                             PasswordChanged="ServerPasswordBox_OnPasswordChanged" />
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Certificat client (.crt ou .pem)" />
+                <TextBox Grid.Row="3" Grid.Column="1"
                          Text="{Binding ClientCertPath, UpdateSourceTrigger=PropertyChanged}" />
 
-                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Cle privee PEM optionnelle" />
-                <TextBox Grid.Row="2" Grid.Column="1"
+                <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Cle privee PEM optionnelle" />
+                <TextBox Grid.Row="4" Grid.Column="1"
                          Text="{Binding ClientKeyPath, UpdateSourceTrigger=PropertyChanged}" />
 
-                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Fichier PEM (prioritaire sur PKCS12)" />
-                <TextBox Grid.Row="3" Grid.Column="1"
+                <TextBlock Grid.Row="5" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Fichier PEM (prioritaire sur PKCS12)" />
+                <TextBox Grid.Row="5" Grid.Column="1"
                          Text="{Binding PemPath, UpdateSourceTrigger=PropertyChanged}" />
 
-                <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Certificat PKCS12 (.p12 / .pfx)" />
-                <TextBox Grid.Row="4" Grid.Column="1"
+                <TextBlock Grid.Row="6" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Certificat PKCS12 (.p12 / .pfx)" />
+                <TextBox Grid.Row="6" Grid.Column="1"
                          Text="{Binding Pkcs12Path, UpdateSourceTrigger=PropertyChanged}" />
 
-                <TextBlock Grid.Row="5" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Mot de passe du certificat" />
+                <TextBlock Grid.Row="7" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Mot de passe du certificat" />
                 <PasswordBox x:Name="CertPasswordBox"
-                             Grid.Row="5"
+                             Grid.Row="7"
                              Grid.Column="1"
                              PasswordChanged="CertPasswordBox_OnPasswordChanged" />
 
-                <TextBlock Grid.Row="6" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Certificat CA" />
-                <TextBox Grid.Row="6" Grid.Column="1"
+                <TextBlock Grid.Row="8" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Certificat CA" />
+                <TextBox Grid.Row="8" Grid.Column="1"
                          Text="{Binding CaCertPath, UpdateSourceTrigger=PropertyChanged}" />
 
-                <TextBlock Grid.Row="7" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Verifier SSL" />
-                <CheckBox Grid.Row="7"
+                <TextBlock Grid.Row="9" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Verifier SSL" />
+                <CheckBox Grid.Row="9"
                           Grid.Column="1"
                           IsChecked="{Binding VerifySsl}"
                           Content="Activer la verification SSL" />
 
-                <TextBlock Grid.Row="8" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Timeout (secondes)" />
-                <TextBox Grid.Row="8" Grid.Column="1"
+                <TextBlock Grid.Row="10" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Timeout (secondes)" />
+                <TextBox Grid.Row="10" Grid.Column="1"
                          Text="{Binding TimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
 
-                <TextBlock Grid.Row="9" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Python executable" />
-                <TextBox Grid.Row="9" Grid.Column="1"
+                <TextBlock Grid.Row="11" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Python executable" />
+                <TextBox Grid.Row="11" Grid.Column="1"
                          Text="{Binding PythonExecutablePath, UpdateSourceTrigger=PropertyChanged}" />
 
-                <TextBlock Grid.Row="10" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Script bridge Python" />
-                <TextBox Grid.Row="10" Grid.Column="1"
+                <TextBlock Grid.Row="12" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" Text="Script bridge Python" />
+                <TextBox Grid.Row="12" Grid.Column="1"
                          Text="{Binding BridgeScriptPath, UpdateSourceTrigger=PropertyChanged}" />
             </Grid>
 
