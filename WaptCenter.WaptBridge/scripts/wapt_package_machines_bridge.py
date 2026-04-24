@@ -37,6 +37,50 @@ COMPLIANT_STATUS = "compliant"
 UNKNOWN_COMPLIANCE_STATUS = "unknown"
 NON_COMPLIANT_STATUS = "non_compliant"
 UNKNOWN_OU_PATH = "OU non renseignee"
+OU_PATH_CANDIDATE_FIELDS = (
+    "ou_path",
+    "ou",
+    "ad_ou",
+    "organizational_unit",
+    "organization_unit",
+    "computer_ad_ou",
+)
+DN_CANDIDATE_FIELDS = (
+    "dn",
+    "computer_dn",
+    "distinguished_name",
+    "computer_ad_dn",
+    "ad_dn",
+)
+ORGANIZATION_CANDIDATE_FIELDS = (
+    "organization",
+    "registered_organization",
+)
+SITE_CANDIDATE_FIELDS = (
+    "site",
+    "computer_ad_site",
+    "ad_site",
+)
+GROUP_CANDIDATE_FIELDS = (
+    "groups",
+    "computer_ad_groups",
+)
+HOST_STRUCTURE_DIAGNOSTIC_FIELDS = (
+    "host",
+    "uuid",
+    "host_uuid",
+    "computer_name",
+    "hostname",
+    "host_computer_name",
+    "computer_fqdn",
+    "fqdn",
+    "host_computer_fqdn",
+    *OU_PATH_CANDIDATE_FIELDS,
+    *DN_CANDIDATE_FIELDS,
+    *ORGANIZATION_CANDIDATE_FIELDS,
+    *SITE_CANDIDATE_FIELDS,
+    *GROUP_CANDIDATE_FIELDS,
+)
 HOST_DATA_FIELD_INSTALLED_PACKAGES = "installed_packages"
 HOSTS_FOR_PACKAGE_SAMPLE_LIMIT = 5
 MAX_HOST_DATA_SAMPLE_COMMANDS = 3
@@ -330,6 +374,91 @@ def package_entry_matches(package_entry: dict, package_id: str) -> bool:
     return bool(package_name) and package_name.lower() == package_id.lower()
 
 
+def normalize_text(value: object) -> str:
+    if value is None:
+        return ""
+
+    if isinstance(value, str):
+        return value.strip()
+
+    if isinstance(value, (int, float, bool)):
+        return str(value).strip()
+
+    return ""
+
+
+def extract_string_list(value: object) -> list[str]:
+    if isinstance(value, (list, tuple, set)):
+        return [str(item).strip() for item in value if str(item).strip()]
+
+    if isinstance(value, str) and value.strip():
+        split_values = [item.strip() for item in value.split(",") if item.strip()]
+        return split_values or [value.strip()]
+
+    return []
+
+
+def summarize_field_value(value: object) -> str:
+    if isinstance(value, dict):
+        return "{keys: " + ", ".join(sorted(value.keys())[:12]) + "}"
+
+    list_values = extract_string_list(value)
+    if list_values:
+        suffix = ", ..." if len(list_values) > 5 else ""
+        return "[" + ", ".join(list_values[:5]) + suffix + "]"
+
+    normalized_value = normalize_text(value)
+    return build_excerpt(normalized_value) if normalized_value else "<empty>"
+
+
+def describe_available_fields(source: dict, field_names: tuple[str, ...]) -> str:
+    if not isinstance(source, dict):
+        return "<none>"
+
+    present_fields = [
+        f"{field_name}={summarize_field_value(source.get(field_name))}"
+        for field_name in field_names
+        if field_name in source
+    ]
+    return "; ".join(present_fields) if present_fields else "<none>"
+
+
+def build_host_structure_details(label: str, host_item: dict) -> list[str]:
+    if not isinstance(host_item, dict) or not host_item:
+        return [f"{label}: <none>"]
+
+    details = [
+        f"{label} top-level keys: " + ", ".join(sorted(host_item.keys())[:40]),
+        f"{label} OU/AD/identity top-level fields: {describe_available_fields(host_item, HOST_STRUCTURE_DIAGNOSTIC_FIELDS)}",
+    ]
+
+    host_info = as_dict(host_item.get("host_info"))
+    if host_info:
+        details.append(f"{label} host_info keys: " + ", ".join(sorted(host_info.keys())[:40]))
+        details.append(
+            f"{label} host_info OU/AD/identity fields: {describe_available_fields(host_info, HOST_STRUCTURE_DIAGNOSTIC_FIELDS)}"
+        )
+    else:
+        details.append(f"{label} host_info keys: <host_info absent>")
+
+    return details
+
+
+def normalize_ou_value(raw_value: str) -> str:
+    value = normalize_text(raw_value)
+    if not value:
+        return ""
+
+    if "OU=" in value.upper():
+        extracted_value = extract_ou_from_dn(value)
+        if extracted_value:
+            return extracted_value
+
+    normalized_separator_value = value.replace("\\", "/").replace("|", "/")
+    segments = [segment.strip() for segment in normalized_separator_value.split("/") if segment.strip()]
+    return " / ".join(segments) if segments else value
+
+
 def extract_ou_from_dn(distinguished_name: str) -> str:
     if not distinguished_name:
         return ""
@@ -346,11 +475,8 @@ def extract_ou_from_dn(distinguished_name: str) -> str:
 def extract_groups(host_item: dict) -> list[str]:
     host_info = as_dict(host_item.get("host_info"))
 
-    raw_candidates = (
-        host_item.get("groups"),
-        host_item.get("computer_ad_groups"),
-        host_info.get("groups"),
-        host_info.get("computer_ad_groups"),
+    raw_candidates = tuple(host_item.get(field_name) for field_name in GROUP_CANDIDATE_FIELDS) + tuple(
+        host_info.get(field_name) for field_name in GROUP_CANDIDATE_FIELDS
     )
 
     for candidate in raw_candidates:
@@ -366,12 +492,43 @@ def extract_groups(host_item: dict) -> list[str]:
     return []
 
 
-def build_organization_display(organization: str, ou_path: str) -> str:
+def resolve_distinguished_name(host_item: dict, host_info: dict) -> str:
+    return first_non_empty(host_item, *DN_CANDIDATE_FIELDS) or first_non_empty(host_info, *DN_CANDIDATE_FIELDS)
+
+
+def resolve_organizational_unit(host_item: dict, host_info: dict, distinguished_name: str) -> str:
+    for candidate_source in (host_item, host_info):
+        candidate_value = first_non_empty(candidate_source, *OU_PATH_CANDIDATE_FIELDS)
+        normalized_candidate = normalize_ou_value(candidate_value)
+        if normalized_candidate:
+            return normalized_candidate
+
+    return extract_ou_from_dn(distinguished_name)
+
+
+def resolve_organization(host_item: dict, host_info: dict) -> str:
+    return first_non_empty(host_item, *ORGANIZATION_CANDIDATE_FIELDS) or first_non_empty(
+        host_info,
+        *ORGANIZATION_CANDIDATE_FIELDS,
+    )
+
+
+def resolve_site(host_item: dict, host_info: dict) -> str:
+    return first_non_empty(host_item, *SITE_CANDIDATE_FIELDS) or first_non_empty(host_info, *SITE_CANDIDATE_FIELDS)
+
+
+def build_organization_display(organization: str, ou_path: str, site: str = "") -> str:
     if organization and ou_path:
         return f"{organization} | {ou_path}"
 
     if organization:
         return organization
+
+    if site and ou_path:
+        return f"{site} | {ou_path}"
+
+    if site:
+        return site
 
     return ou_path or UNKNOWN_OU_PATH
 
@@ -408,20 +565,14 @@ def normalize_machine(
     if not last_seen:
         last_seen = first_non_empty(wapt_status, "last_seen", "last_update_status", "last_update")
 
-    distinguished_name = first_non_empty(host_item, "computer_ad_dn", "ad_dn")
-    if not distinguished_name:
-        distinguished_name = first_non_empty(host_info, "computer_ad_dn", "ad_dn")
-
-    organizational_unit = first_non_empty(host_item, "organizational_unit", "organization_unit", "ou")
-    if not organizational_unit:
-        organizational_unit = extract_ou_from_dn(distinguished_name)
+    distinguished_name = resolve_distinguished_name(host_item, host_info)
+    organizational_unit = resolve_organizational_unit(host_item, host_info, distinguished_name)
     ou_path = organizational_unit or UNKNOWN_OU_PATH
 
-    organization = first_non_empty(host_item, "organization", "registered_organization")
-    if not organization:
-        organization = first_non_empty(host_info, "registered_organization", "organization")
+    organization = resolve_organization(host_item, host_info)
+    site = resolve_site(host_item, host_info)
     groups = extract_groups(host_item)
-    organization_display = build_organization_display(organization, ou_path)
+    organization_display = build_organization_display(organization, ou_path, site)
 
     status = first_non_empty(package_entry, "status", "install_status", "state", "package_status")
     if not status:
@@ -521,10 +672,8 @@ def build_detected_structure_details(command_payload: object, host_items: list[d
 
     if host_items:
         first_host = host_items[0]
-        details.append("First host row keys: " + ", ".join(sorted(first_host.keys())[:40]))
+        details.extend(build_host_structure_details("First host row", first_host))
         host_info = as_dict(first_host.get("host_info"))
-        if host_info:
-            details.append("First host_info keys: " + ", ".join(sorted(host_info.keys())[:40]))
         wapt_status = as_dict(first_host.get("wapt_status"))
         if wapt_status:
             details.append("First wapt_status keys: " + ", ".join(sorted(wapt_status.keys())[:40]))
@@ -565,21 +714,83 @@ def normalize_machine_from_depends(host_item: dict, package_id: str) -> dict:
     )
 
 
-def normalize_machine_from_hosts_for_package(package_row: dict, package_id: str) -> dict:
-    host_item = {
-        "uuid": first_non_empty(package_row, "host", "uuid", "host_uuid"),
-        "computer_name": first_non_empty(package_row, "host_computer_name", "computer_name", "hostname"),
-        "computer_fqdn": first_non_empty(package_row, "host_computer_fqdn", "computer_fqdn", "fqdn"),
-        "host_status": first_non_empty(package_row, "reachable", "host_status", "status") or "OK",
-        "last_seen_on": first_non_empty(package_row, "listening_timestamp", "updated_on", "last_audit_on", "install_date"),
-        "organization": first_non_empty(package_row, "registered_organization", "organization"),
-        "host_info": {
-            "computer_name": first_non_empty(package_row, "host_computer_name", "computer_name", "hostname"),
-            "computer_fqdn": first_non_empty(package_row, "host_computer_fqdn", "computer_fqdn", "fqdn"),
-            "computer_ad_dn": first_non_empty(package_row, "host_computer_ad_dn", "computer_ad_dn", "ad_dn"),
-            "registered_organization": first_non_empty(package_row, "registered_organization", "organization"),
-        },
-    }
+def set_if_missing(target: dict, key: str, value: object) -> None:
+    normalized_value = normalize_text(value)
+    if not normalized_value:
+        return
+
+    if not normalize_text(target.get(key)):
+        target[key] = normalized_value
+
+
+def resolve_host_lookup_keys(host_item: dict) -> set[str]:
+    host_info = as_dict(host_item.get("host_info"))
+    raw_values = [
+        first_non_empty(host_item, "host", "uuid", "host_uuid", "computer_uuid", "id"),
+        first_non_empty(host_item, "host_computer_fqdn", "computer_fqdn", "fqdn", "host"),
+        first_non_empty(host_item, "host_computer_name", "computer_name", "hostname", "host_name", "name"),
+        first_non_empty(host_info, "uuid", "host_uuid", "computer_uuid", "id"),
+        first_non_empty(host_info, "computer_fqdn", "fqdn"),
+        first_non_empty(host_info, "computer_name", "hostname", "host_name", "name"),
+    ]
+
+    normalized_keys: set[str] = set()
+    for raw_value in raw_values:
+        normalized_value = normalize_text(raw_value).lower()
+        if not normalized_value:
+            continue
+
+        normalized_keys.add(normalized_value)
+        if "." in normalized_value:
+            normalized_keys.add(normalized_value.split(".", 1)[0])
+
+    return normalized_keys
+
+
+def build_host_inventory_index(host_items: list[dict]) -> dict[str, dict]:
+    inventory_index: dict[str, dict] = {}
+
+    for host_item in host_items:
+        for lookup_key in resolve_host_lookup_keys(host_item):
+            inventory_index.setdefault(lookup_key, host_item)
+
+    return inventory_index
+
+
+def resolve_inventory_host_item(package_row: dict, host_inventory_index: dict[str, dict]) -> dict:
+    for lookup_key in resolve_host_lookup_keys(package_row):
+        if lookup_key in host_inventory_index:
+            return host_inventory_index[lookup_key]
+
+    return {}
+
+
+def normalize_machine_from_hosts_for_package(
+    package_row: dict,
+    package_id: str,
+    inventory_host_item: dict | None = None,
+) -> dict:
+    host_item = dict(inventory_host_item or {})
+    host_info = dict(as_dict(host_item.get("host_info")))
+
+    set_if_missing(host_item, "uuid", first_non_empty(package_row, "host", "uuid", "host_uuid"))
+    set_if_missing(host_item, "computer_name", first_non_empty(package_row, "host_computer_name", "computer_name", "hostname"))
+    set_if_missing(host_item, "computer_fqdn", first_non_empty(package_row, "host_computer_fqdn", "computer_fqdn", "fqdn"))
+    set_if_missing(host_item, "host_status", first_non_empty(package_row, "reachable", "host_status", "status") or "OK")
+    set_if_missing(host_item, "last_seen_on", first_non_empty(package_row, "listening_timestamp", "updated_on", "last_audit_on", "install_date"))
+    set_if_missing(host_item, "organization", first_non_empty(package_row, *ORGANIZATION_CANDIDATE_FIELDS))
+    set_if_missing(host_item, "site", first_non_empty(package_row, *SITE_CANDIDATE_FIELDS))
+    set_if_missing(host_item, "computer_ad_dn", first_non_empty(package_row, "host_computer_ad_dn", *DN_CANDIDATE_FIELDS))
+    set_if_missing(host_item, "ou", first_non_empty(package_row, *OU_PATH_CANDIDATE_FIELDS))
+
+    set_if_missing(host_info, "computer_name", first_non_empty(package_row, "host_computer_name", "computer_name", "hostname"))
+    set_if_missing(host_info, "computer_fqdn", first_non_empty(package_row, "host_computer_fqdn", "computer_fqdn", "fqdn"))
+    set_if_missing(host_info, "computer_ad_dn", first_non_empty(package_row, "host_computer_ad_dn", *DN_CANDIDATE_FIELDS))
+    set_if_missing(host_info, "registered_organization", first_non_empty(package_row, *ORGANIZATION_CANDIDATE_FIELDS))
+    set_if_missing(host_info, "computer_ad_site", first_non_empty(package_row, *SITE_CANDIDATE_FIELDS))
+
+    if host_info:
+        host_item["host_info"] = host_info
 
     return normalize_machine(host_item, package_row, package_id)
 
@@ -588,6 +799,7 @@ def scan_hosts_for_package(
     args: argparse.Namespace,
     wapt_get_executable: Path,
     config_path: Path,
+    host_inventory_index: dict[str, dict],
 ) -> tuple[list[dict], list[str], bool]:
     action = f"api/v3/hosts_for_package?package={args.package_id}"
     command_arguments = build_server_request_command_arguments(args, action)
@@ -637,16 +849,78 @@ def scan_hosts_for_package(
         )
         return [], details, auth_failure_detected
 
-    machines = deduplicate_machines(
-        [
-            normalize_machine_from_hosts_for_package(package_row, args.package_id)
-            for package_row in result_items
-            if package_entry_matches(package_row, args.package_id)
-        ]
-    )
+    machines: list[dict] = []
+    matched_rows_count = 0
+    enrichment_match_count = 0
+    sample_endpoint_row: dict = {}
+    sample_inventory_host_item: dict = {}
+    sample_missing_ou_endpoint_row: dict = {}
+    sample_missing_ou_inventory_host_item: dict = {}
+
+    for package_row in result_items:
+        if not package_entry_matches(package_row, args.package_id):
+            continue
+
+        matched_rows_count += 1
+        inventory_host_item = resolve_inventory_host_item(package_row, host_inventory_index)
+        if inventory_host_item:
+            enrichment_match_count += 1
+
+        if not sample_endpoint_row:
+            sample_endpoint_row = package_row
+            sample_inventory_host_item = inventory_host_item
+
+        machine = normalize_machine_from_hosts_for_package(package_row, args.package_id, inventory_host_item)
+        machines.append(machine)
+
+        if machine.get("ou_path") == UNKNOWN_OU_PATH and not sample_missing_ou_endpoint_row:
+            sample_missing_ou_endpoint_row = package_row
+            sample_missing_ou_inventory_host_item = inventory_host_item
+
+    machines = deduplicate_machines(machines)
     details.append(
         f"Strategy [{HOSTS_FOR_PACKAGE_FALLBACK_STRATEGY}] machines matching package_id exactly: {len(machines)}"
     )
+    details.append(
+        f"Strategy [{HOSTS_FOR_PACKAGE_FALLBACK_STRATEGY}] inventory enrichment matches from list-hosts: {enrichment_match_count}/{matched_rows_count}"
+    )
+
+    if sample_endpoint_row:
+        details.extend(
+            build_host_structure_details(
+                f"Strategy [{HOSTS_FOR_PACKAGE_FALLBACK_STRATEGY}] sample endpoint row",
+                sample_endpoint_row,
+            )
+        )
+
+    if sample_inventory_host_item:
+        details.extend(
+            build_host_structure_details(
+                f"Strategy [{HOSTS_FOR_PACKAGE_FALLBACK_STRATEGY}] sample inventory enrichment row",
+                sample_inventory_host_item,
+            )
+        )
+
+    unresolved_ou_count = sum(1 for machine in machines if machine.get("ou_path") == UNKNOWN_OU_PATH)
+    details.append(
+        f"Strategy [{HOSTS_FOR_PACKAGE_FALLBACK_STRATEGY}] machines with unresolved OU after normalization: {unresolved_ou_count}"
+    )
+
+    if sample_missing_ou_endpoint_row:
+        details.extend(
+            build_host_structure_details(
+                f"Strategy [{HOSTS_FOR_PACKAGE_FALLBACK_STRATEGY}] sample unresolved OU endpoint row",
+                sample_missing_ou_endpoint_row,
+            )
+        )
+
+    if sample_missing_ou_inventory_host_item:
+        details.extend(
+            build_host_structure_details(
+                f"Strategy [{HOSTS_FOR_PACKAGE_FALLBACK_STRATEGY}] sample unresolved OU inventory row",
+                sample_missing_ou_inventory_host_item,
+            )
+        )
 
     for index, package_row in enumerate(result_items[:HOSTS_FOR_PACKAGE_SAMPLE_LIMIT], start=1):
         details.append(
@@ -921,8 +1195,12 @@ def execute_bridge(args: argparse.Namespace) -> dict:
                 )
 
             host_items = extract_host_items(command_payload)
+            host_inventory_index = build_host_inventory_index(host_items)
             technical_details.append(f"Strategy [{HOST_SEARCH_STRATEGY}] command columns: {LIST_HOSTS_INVENTORY_COLUMNS}")
             technical_details.append(f"Hosts analysed: {len(host_items)}")
+            technical_details.append(
+                f"Strategy [{HOST_SEARCH_STRATEGY}] list-hosts inventory index size: {len(host_inventory_index)}"
+            )
             technical_details.extend(build_detected_structure_details(command_payload, host_items))
 
             machines: list[dict] = []
@@ -1000,6 +1278,7 @@ def execute_bridge(args: argparse.Namespace) -> dict:
                     args,
                     wapt_get_executable,
                     config_path,
+                    host_inventory_index,
                 )
                 technical_details.extend(hosts_for_package_details)
 
