@@ -1,9 +1,13 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Win32;
+using System.Windows;
 using WaptCenter.Models;
 using WaptCenter.Services;
 
@@ -36,10 +40,12 @@ public partial class PackageDetailsViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ReloadCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ExportCsvCommand))]
     private bool isLoadingMachines;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ReloadCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ExportCsvCommand))]
     private WaptPackage? selectedPackage;
 
     [ObservableProperty]
@@ -96,6 +102,54 @@ public partial class PackageDetailsViewModel : ObservableObject
         await LoadForPackageAsync(SelectedPackage);
     }
 
+    [RelayCommand(CanExecute = nameof(CanExportCsv))]
+    private void ExportCsv()
+    {
+        if (SelectedPackage is null || FilteredMachines.Count == 0)
+        {
+            const string noMachineMessage = "Aucune machine visible n'est disponible pour l'export CSV.";
+            IsStatusError = true;
+            StatusMessage = noMachineMessage;
+            MessageBox.Show(noMachineMessage, "Exporter CSV", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var dialog = new SaveFileDialog
+        {
+            Title = "Exporter les machines affichees",
+            Filter = "CSV UTF-8 (*.csv)|*.csv|Tous les fichiers (*.*)|*.*",
+            DefaultExt = ".csv",
+            AddExtension = true,
+            FileName = BuildDefaultCsvFileName()
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        var machinesToExport = FilteredMachines.ToList();
+
+        try
+        {
+            File.WriteAllText(dialog.FileName, BuildCsvContent(machinesToExport), new UTF8Encoding(true));
+
+            var successMessage =
+                $"{machinesToExport.Count} machine(s) visible(s) exportee(s) dans '{dialog.FileName}'.";
+            IsStatusError = false;
+            StatusMessage = successMessage;
+            MessageBox.Show(successMessage, "Exporter CSV", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception exception)
+        {
+            var errorMessage =
+                $"L'export CSV des machines visibles a echoue : {exception.Message}";
+            IsStatusError = true;
+            StatusMessage = errorMessage;
+            MessageBox.Show(errorMessage, "Exporter CSV", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     public void ClearSelection()
     {
         CancelPendingLoad();
@@ -120,6 +174,7 @@ public partial class PackageDetailsViewModel : ObservableObject
         NonCompliantMachineCount = 0;
         HasOnlyDependsFallbackMachines = false;
         IsLoadingMachines = false;
+        ExportCsvCommand.NotifyCanExecuteChanged();
     }
 
     public async Task LoadForPackageAsync(WaptPackage? package)
@@ -151,6 +206,7 @@ public partial class PackageDetailsViewModel : ObservableObject
             MatchTypeSummaryMessage = string.Empty;
             ComplianceSummaryMessage = string.Empty;
             OuSummaryMessage = string.Empty;
+            ExportCsvCommand.NotifyCanExecuteChanged();
             return;
         }
 
@@ -421,6 +477,88 @@ public partial class PackageDetailsViewModel : ObservableObject
         UpdateMatchTypeWarning(filteredMachines);
         UpdateOuSummary(filteredMachines);
         UpdateOuComplianceBreakdown(filteredMachines);
+        ExportCsvCommand.NotifyCanExecuteChanged();
+    }
+
+    private bool CanExportCsv()
+    {
+        return !IsLoadingMachines && SelectedPackage is not null && FilteredMachines.Count > 0;
+    }
+
+    private string BuildDefaultCsvFileName()
+    {
+        var packageId = SanitizeFileNameSegment(SelectedPackage?.PackageId);
+        var filterLabel = IsAllOuFilterSelected() ? "all-ou" : SanitizeFileNameSegment(SelectedOuFilter);
+        var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+        return $"wapt-machines-{packageId}-{filterLabel}-{timestamp}.csv";
+    }
+
+    private static string BuildCsvContent(IReadOnlyCollection<WaptMachine> machines)
+    {
+        var lines = new List<string>
+        {
+            string.Join(";", new[]
+            {
+                "PackageId",
+                "Hostname",
+                "FQDN",
+                "OU / Organisation",
+                "Version installee",
+                "Type de correspondance",
+                "Statut conformite",
+                "Last seen",
+                "Etat hote"
+            })
+        };
+
+        foreach (var machine in machines)
+        {
+            lines.Add(string.Join(";", new[]
+            {
+                EscapeCsvValue(machine.PackageId),
+                EscapeCsvValue(machine.Hostname),
+                EscapeCsvValue(machine.Fqdn),
+                EscapeCsvValue(machine.OrganizationDisplay),
+                EscapeCsvValue(machine.InstalledVersion),
+                EscapeCsvValue(machine.MatchTypeDisplayLabel),
+                EscapeCsvValue(machine.ComplianceStatusDisplayLabel),
+                EscapeCsvValue(machine.LastSeen),
+                EscapeCsvValue(machine.Status)
+            }));
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private static string EscapeCsvValue(string? value)
+    {
+        var normalizedValue = value ?? string.Empty;
+        var requiresQuotes = normalizedValue.Contains(';') ||
+                             normalizedValue.Contains('"') ||
+                             normalizedValue.Contains('\r') ||
+                             normalizedValue.Contains('\n');
+
+        if (!requiresQuotes)
+        {
+            return normalizedValue;
+        }
+
+        return $"\"{normalizedValue.Replace("\"", "\"\"")}\"";
+    }
+
+    private static string SanitizeFileNameSegment(string? value)
+    {
+        var normalizedValue = string.IsNullOrWhiteSpace(value) ? "machines" : value.Trim();
+        var invalidCharacters = Path.GetInvalidFileNameChars();
+        var builder = new StringBuilder(normalizedValue.Length);
+
+        foreach (var character in normalizedValue)
+        {
+            builder.Append(invalidCharacters.Contains(character) || char.IsWhiteSpace(character) ? '-' : character);
+        }
+
+        var sanitizedValue = builder.ToString().Trim('-');
+        return string.IsNullOrWhiteSpace(sanitizedValue) ? "machines" : sanitizedValue;
     }
 
     private bool IsAllOuFilterSelected()

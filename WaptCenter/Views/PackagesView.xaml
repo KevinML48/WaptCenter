@@ -529,6 +529,13 @@
                     <TextBlock Style="{StaticResource PageCardSubtitleTextStyle}"
                                Text="La grille machines garde une grande surface de lecture, des colonnes redimensionnables et un scroll horizontal si la largeur visible ne suffit pas." />
 
+                    <StackPanel Margin="0,16,0,0"
+                        Orientation="Horizontal">
+                    <Button Style="{StaticResource PrimaryActionButtonStyle}"
+                        Command="{Binding PackageDetails.ExportCsvCommand}"
+                        Content="Exporter CSV" />
+                    </StackPanel>
+
                     <DataGrid Margin="0,18,0,0"
                               Height="460"
                               MinHeight="400"
