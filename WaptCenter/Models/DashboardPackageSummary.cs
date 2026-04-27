@@ -17,4 +17,10 @@ public sealed class DashboardPackageSummary
     public int NonCompliantCount { get; set; }
 
     public int DistinctOuCount { get; set; }
+
+    public string MachineLoadStatus { get; set; } = string.Empty;
+
+    public string MachineStrategy { get; set; } = string.Empty;
+
+    public string MachineLoadMessage { get; set; } = string.Empty;
 }

@@ -25,6 +25,19 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="DashboardLoadingHintTextStyle" TargetType="TextBlock">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Setter Property="Margin" Value="0,10,0,0" />
+            <Setter Property="Foreground" Value="#5E6B84" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsLoadingDashboard}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="DashboardTechnicalDetailsExpanderStyle" TargetType="Expander">
             <Setter Property="Visibility" Value="Visible" />
             <Setter Property="Margin" Value="0,16,0,0" />
@@ -195,6 +208,8 @@
             <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
             <Setter Property="EnableRowVirtualization" Value="True" />
             <Setter Property="EnableColumnVirtualization" Value="True" />
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True" />
+            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling" />
             <Setter Property="MinRowHeight" Value="38" />
         </Style>
     </UserControl.Resources>
@@ -231,9 +246,13 @@
                                      Value="{Binding AnalyzedPackageCount}"
                                      Style="{StaticResource DashboardProgressStyle}" />
 
+                        <TextBlock Style="{StaticResource DashboardLoadingHintTextStyle}"
+                                   Text="Chargement progressif en cours. Les cartes et les grilles se mettent a jour par lots sans bloquer l'interface." />
+
                         <Grid Margin="0,18,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="1.4*" />
+                                <ColumnDefinition Width="1*" />
                                 <ColumnDefinition Width="1*" />
                                 <ColumnDefinition Width="1*" />
                             </Grid.ColumnDefinitions>
@@ -265,11 +284,21 @@
                                           ItemsSource="{Binding ComplianceFilters}"
                                           SelectedItem="{Binding SelectedComplianceFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
+
+                            <StackPanel Grid.Column="3"
+                                        Margin="14,0,0,0">
+                                <TextBlock Style="{StaticResource FilterLabelTextStyle}"
+                                           Text="Mode d'analyse" />
+                                <ComboBox Height="38"
+                                          Margin="0,8,0,0"
+                                          ItemsSource="{Binding AnalysisModes}"
+                                          SelectedItem="{Binding SelectedAnalysisMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
                         </Grid>
 
                         <TextBlock Margin="0,10,0,0"
                                    Style="{StaticResource SummaryCardHintTextStyle}"
-                                   Text="Les filtres s'appliquent aux deux grilles de synthese et aux exports CSV. Les cartes de resume restent globales." />
+                                   Text="Les filtres s'appliquent aux deux grilles de synthese et aux exports CSV. Le mode rapide limite l'analyse detaillee a un sous-ensemble de paquets pour accelerer le premier chargement." />
                     </StackPanel>
 
                     <Border Grid.Column="1"
@@ -291,6 +320,23 @@
                                        Text="{Binding CurrentPackageLabel}" />
                             <TextBlock Style="{StaticResource SummaryCardHintTextStyle}"
                                        Text="{Binding AnalyzedPackageCount, StringFormat={}{0} paquet(s) traites}" />
+                            <TextBlock Style="{StaticResource SummaryCardHintTextStyle}"
+                                       Text="{Binding SelectedAnalysisMode, StringFormat=Mode: {0}}" />
+                            <TextBlock Margin="0,12,0,0"
+                                       Style="{StaticResource SummaryCardLabelTextStyle}"
+                                       Text="Performance" />
+                            <TextBlock Style="{StaticResource SummaryCardHintTextStyle}"
+                                       Text="{Binding DashboardPackageLoadDurationMetric}" />
+                            <TextBlock Style="{StaticResource SummaryCardHintTextStyle}"
+                                       Text="{Binding DashboardAnalysisDurationMetric}" />
+                            <TextBlock Style="{StaticResource SummaryCardHintTextStyle}"
+                                       Text="{Binding DashboardPackageCacheStatusMetric}" />
+                            <TextBlock Style="{StaticResource SummaryCardHintTextStyle}"
+                                       Text="{Binding DashboardMachineCacheStatusMetric}" />
+                            <TextBlock Style="{StaticResource SummaryCardHintTextStyle}"
+                                       Text="{Binding DashboardMachineCallStatusMetric}" />
+                            <TextBlock Style="{StaticResource SummaryCardHintTextStyle}"
+                                       Text="{Binding DashboardMachineReturnedRowsMetric}" />
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -302,9 +348,9 @@
                         <TextBlock Style="{StaticResource SummaryCardLabelTextStyle}"
                                    Text="Paquets cd48" />
                         <TextBlock Style="{StaticResource SummaryCardValueTextStyle}"
-                                   Text="{Binding TotalPackageCount}" />
+                                   Text="{Binding AvailablePackageCount}" />
                         <TextBlock Style="{StaticResource SummaryCardHintTextStyle}"
-                                   Text="Nombre total de paquets remontes par le bridge packages." />
+                                   Text="Nombre total de paquets remontes par le bridge packages. En mode rapide, seule une partie est analysee en detail." />
                     </StackPanel>
                 </Border>
 
@@ -404,6 +450,17 @@
                             <DataGridTextColumn Header="Inconnues" Binding="{Binding UnknownCount}" Width="110" MinWidth="100" />
                             <DataGridTextColumn Header="Non conformes" Binding="{Binding NonCompliantCount}" Width="130" MinWidth="120" />
                             <DataGridTextColumn Header="OU distinctes" Binding="{Binding DistinctOuCount}" Width="120" MinWidth="110" />
+                            <DataGridTextColumn Header="Statut machines" Binding="{Binding MachineLoadStatus}" Width="130" MinWidth="120" />
+                            <DataGridTextColumn Header="Stratégie" Binding="{Binding MachineStrategy}" Width="1.7*" MinWidth="220">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource WrappingGridTextStyle}" />
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Message machines" Binding="{Binding MachineLoadMessage}" Width="2*" MinWidth="260">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource WrappingGridTextStyle}" />
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
                         </DataGrid.Columns>
                     </DataGrid>
                 </StackPanel>

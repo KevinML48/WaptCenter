@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -16,18 +17,91 @@ public sealed class WaptBridgeMachineService
         PropertyNameCaseInsensitive = true
     };
 
-    public string LastTechnicalDetails { get; private set; } = string.Empty;
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(3);
+    private static readonly ConcurrentDictionary<string, BridgeMachinesCacheEntry> Cache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, Lazy<Task<BridgeMachinesCacheEntry>>> InFlightRequests = new(StringComparer.OrdinalIgnoreCase);
+
+    private string _lastTechnicalDetails = string.Empty;
+
+    public string LastTechnicalDetails
+    {
+        get => _lastTechnicalDetails;
+        private set => _lastTechnicalDetails = value;
+    }
 
     public async Task<List<WaptMachine>> GetMachinesForPackageAsync(
         WaptConfig config,
         string packageId,
         CancellationToken cancellationToken = default)
     {
+        var result = await GetMachineResultForPackageAsync(config, packageId, cancellationToken).ConfigureAwait(false);
+        return result.Machines;
+    }
+
+    public async Task<WaptBridgeMachinesResult> GetMachineResultForPackageAsync(
+        WaptConfig config,
+        string packageId,
+        CancellationToken cancellationToken = default)
+    {
         ValidateConfig(config, packageId);
 
+        var cacheKey = BuildCacheKey(config, packageId);
+        if (TryGetFreshCacheEntry(cacheKey, out var cacheEntry, out var cacheAge))
+        {
+            var technicalDetails = BuildCacheTechnicalDetails(
+                cacheEntry.TechnicalDetails,
+                "memory-hit",
+                cacheAge,
+                TimeSpan.Zero);
+            LastTechnicalDetails = technicalDetails;
+
+            return new WaptBridgeMachinesResult(CloneMachines(cacheEntry.Machines), technicalDetails);
+        }
+
+        var waitStopwatch = Stopwatch.StartNew();
+        var createdRequest = new Lazy<Task<BridgeMachinesCacheEntry>>(
+            () => ObserveFaults(ExecuteMachinesBridgeAsync(config, packageId, cacheKey)),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+
+        var activeRequest = InFlightRequests.GetOrAdd(cacheKey, createdRequest);
+        var joinedInFlightRequest = !ReferenceEquals(activeRequest, createdRequest);
+
+        try
+        {
+            var completedEntry = await activeRequest.Value.WaitAsync(cancellationToken);
+            waitStopwatch.Stop();
+
+            var technicalDetails = BuildCacheTechnicalDetails(
+                completedEntry.TechnicalDetails,
+                joinedInFlightRequest ? "shared-inflight" : "memory-miss",
+                DateTimeOffset.UtcNow - completedEntry.CreatedAtUtc,
+                waitStopwatch.Elapsed);
+            LastTechnicalDetails = technicalDetails;
+
+            return new WaptBridgeMachinesResult(CloneMachines(completedEntry.Machines), technicalDetails);
+        }
+        catch (BridgeMachinesRequestException exception)
+        {
+            LastTechnicalDetails = exception.TechnicalDetails;
+            throw new WaptBridgeMachinesException(exception.Message, exception.TechnicalDetails, exception);
+        }
+        finally
+        {
+            if (ReferenceEquals(activeRequest, createdRequest))
+            {
+                InFlightRequests.TryRemove(cacheKey, out _);
+            }
+        }
+    }
+
+    private static async Task<BridgeMachinesCacheEntry> ExecuteMachinesBridgeAsync(
+        WaptConfig config,
+        string packageId,
+        string cacheKey)
+    {
         var pythonExecutablePath = ResolveExecutablePath(config.PythonExecutablePath);
         var bridgeScriptPath = ResolveMachineBridgeScriptPath(config);
-        LastTechnicalDetails = string.Empty;
+        var executionStopwatch = Stopwatch.StartNew();
 
         var startInfo = new ProcessStartInfo
         {
@@ -80,63 +154,112 @@ public sealed class WaptBridgeMachineService
             var stdoutTask = process.StandardOutput.ReadToEndAsync();
             var stderrTask = process.StandardError.ReadToEndAsync();
 
-            await process.WaitForExitAsync(cancellationToken);
+            await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
 
-            var stdout = await stdoutTask;
-            var stderr = await stderrTask;
+            var stdout = await stdoutTask.ConfigureAwait(false);
+            var stderr = await stderrTask.ConfigureAwait(false);
             var bridgeResponse = DeserializeBridgeResponse(stdout);
 
-            LastTechnicalDetails = BuildTechnicalDetails(
+            executionStopwatch.Stop();
+
+            if (bridgeResponse is not null)
+            {
+                bridgeResponse.Machines ??= [];
+            }
+
+            var technicalDetails = BuildTechnicalDetails(
                 pythonExecutablePath,
                 bridgeScriptPath,
                 packageId,
                 config.ServerUser,
                 process.ExitCode,
+                bridgeResponse?.Success,
+                bridgeResponse?.Message,
+                bridgeResponse?.Machines?.Count,
                 bridgeResponse?.TechnicalDetails,
                 stderr,
                 stdout,
-                bridgeResponse is null);
+                bridgeResponse is null,
+                executionStopwatch.Elapsed);
 
             if (bridgeResponse is null)
             {
-                throw new InvalidOperationException("Le bridge machines Python WAPT a retourne un JSON invalide.");
+                throw new BridgeMachinesRequestException(
+                    "Le bridge machines Python WAPT a retourne un JSON invalide.",
+                    technicalDetails);
             }
 
             NormalizeMachineMetadata(bridgeResponse.Machines);
 
             if (process.ExitCode != 0 || !bridgeResponse.Success)
             {
-                throw new InvalidOperationException(
+                throw new BridgeMachinesRequestException(
                     string.IsNullOrWhiteSpace(bridgeResponse.Message)
                         ? "Le bridge machines Python WAPT a echoue."
-                        : bridgeResponse.Message);
+                        : bridgeResponse.Message,
+                    technicalDetails);
             }
 
-            return bridgeResponse.Machines;
+            var cacheEntry = new BridgeMachinesCacheEntry(
+                CloneMachines(bridgeResponse.Machines),
+                technicalDetails,
+                DateTimeOffset.UtcNow);
+
+            Cache[cacheKey] = cacheEntry;
+            return cacheEntry;
         }
-        catch (OperationCanceledException)
+        catch (BridgeMachinesRequestException)
         {
-            TryTerminate(process);
             throw;
         }
         catch (Exception exception)
         {
-            if (string.IsNullOrWhiteSpace(LastTechnicalDetails))
+            executionStopwatch.Stop();
+
+            var technicalDetails = BuildTechnicalDetails(
+                pythonExecutablePath,
+                bridgeScriptPath,
+                packageId,
+                config.ServerUser,
+                GetExitCodeOrDefault(process),
+                null,
+                null,
+                null,
+                null,
+                string.Empty,
+                exception.ToString(),
+                includeRawStdout: true,
+                executionStopwatch.Elapsed);
+
+            throw new BridgeMachinesRequestException(
+                string.IsNullOrWhiteSpace(exception.Message)
+                    ? "Le bridge machines Python WAPT a echoue."
+                    : exception.Message,
+                technicalDetails,
+                exception);
+        }
+    }
+
+    private static bool TryGetFreshCacheEntry(
+        string cacheKey,
+        out BridgeMachinesCacheEntry cacheEntry,
+        out TimeSpan cacheAge)
+    {
+        if (Cache.TryGetValue(cacheKey, out var existingEntry) && existingEntry is not null)
+        {
+            cacheEntry = existingEntry;
+            cacheAge = DateTimeOffset.UtcNow - cacheEntry.CreatedAtUtc;
+            if (cacheAge <= CacheTtl)
             {
-                LastTechnicalDetails = BuildTechnicalDetails(
-                    pythonExecutablePath,
-                    bridgeScriptPath,
-                    packageId,
-                    config.ServerUser,
-                    GetExitCodeOrDefault(process),
-                    null,
-                    string.Empty,
-                    exception.ToString(),
-                    includeRawStdout: true);
+                return true;
             }
 
-            throw;
+            Cache.TryRemove(cacheKey, out _);
         }
+
+        cacheEntry = default!;
+        cacheAge = TimeSpan.Zero;
+        return false;
     }
 
     private static void ValidateConfig(WaptConfig config, string packageId)
@@ -323,10 +446,14 @@ public sealed class WaptBridgeMachineService
         string packageId,
         string? serverUser,
         int exitCode,
+        bool? bridgeSuccess,
+        string? bridgeMessage,
+        int? machineCount,
         string? bridgeTechnicalDetails,
         string stderr,
         string stdout,
-        bool includeRawStdout)
+        bool includeRawStdout,
+        TimeSpan executionDuration)
     {
         var builder = new StringBuilder();
         builder.AppendLine("Bridge strategy: .NET -> Python script -> native WAPT hosts inventory");
@@ -335,6 +462,10 @@ public sealed class WaptBridgeMachineService
         builder.AppendLine($"Package_id requested: {packageId}");
         builder.AppendLine($"Server inventory user: {serverUser}");
         builder.AppendLine($"Process exit code: {exitCode}");
+        builder.AppendLine($"Bridge execution duration: {FormatDuration(executionDuration)}");
+        builder.AppendLine($"Machine bridge response success: {FormatNullableBoolean(bridgeSuccess)}");
+        builder.AppendLine($"Machine bridge response message: {FormatValueOrPlaceholder(bridgeMessage)}");
+        builder.AppendLine($"Machine bridge returned machine count: {machineCount?.ToString() ?? "<unknown>"}");
 
         if (!string.IsNullOrWhiteSpace(bridgeTechnicalDetails))
         {
@@ -360,18 +491,107 @@ public sealed class WaptBridgeMachineService
         return builder.ToString().Trim();
     }
 
-    private static void TryTerminate(Process process)
+    private static string BuildCacheTechnicalDetails(
+        string technicalDetails,
+        string cacheStatus,
+        TimeSpan cacheAge,
+        TimeSpan waitDuration)
     {
-        try
+        var builder = new StringBuilder();
+        builder.AppendLine($"Cache TTL: {FormatDuration(CacheTtl)}");
+        builder.AppendLine($"Cache status: {cacheStatus}");
+
+        if (cacheAge > TimeSpan.Zero)
         {
-            if (!process.HasExited)
-            {
-                process.Kill(true);
-            }
+            builder.AppendLine($"Cached response age: {FormatDuration(cacheAge)}");
         }
-        catch
+
+        if (waitDuration > TimeSpan.Zero)
         {
+            builder.AppendLine($"Request wait duration: {FormatDuration(waitDuration)}");
         }
+
+        if (!string.IsNullOrWhiteSpace(technicalDetails))
+        {
+            builder.AppendLine();
+            builder.AppendLine(technicalDetails.Trim());
+        }
+
+        return builder.ToString().Trim();
+    }
+
+    private static string BuildCacheKey(WaptConfig config, string packageId)
+    {
+        return string.Join("|", new[]
+        {
+            NormalizeKeyPart(packageId),
+            NormalizeKeyPart(config.ServerUrl),
+            NormalizeKeyPart(config.ServerUser),
+            NormalizeKeyPart(config.ClientCertPath),
+            NormalizeKeyPart(config.ClientKeyPath),
+            NormalizeKeyPart(config.PemPath),
+            NormalizeKeyPart(config.Pkcs12Path),
+            NormalizeKeyPart(config.CaCertPath),
+            NormalizeKeyPart(config.PythonExecutablePath),
+            NormalizeKeyPart(config.BridgeScriptPath),
+            config.VerifySsl ? "ssl-on" : "ssl-off",
+            Math.Max(1, config.TimeoutSeconds).ToString()
+        });
+    }
+
+    private static string NormalizeKeyPart(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : value.Trim().ToLowerInvariant();
+    }
+
+    private static List<WaptMachine> CloneMachines(IEnumerable<WaptMachine> machines)
+    {
+        return machines.Select(machine => new WaptMachine
+        {
+            Hostname = machine.Hostname,
+            Fqdn = machine.Fqdn,
+            PackageId = machine.PackageId,
+            InstalledVersion = machine.InstalledVersion,
+            MatchType = machine.MatchType,
+            IsExactInstall = machine.IsExactInstall,
+            ComplianceStatus = machine.ComplianceStatus,
+            Status = machine.Status,
+            LastSeen = machine.LastSeen,
+            OrganizationalUnit = machine.OrganizationalUnit,
+            OuPath = machine.OuPath,
+            Organization = machine.Organization,
+            OrganizationDisplay = machine.OrganizationDisplay,
+            Groups = [.. machine.Groups],
+            Uuid = machine.Uuid
+        }).ToList();
+    }
+
+    private static Task<T> ObserveFaults<T>(Task<T> task)
+    {
+        _ = task.ContinueWith(
+            static completedTask => _ = completedTask.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+        return task;
+    }
+
+    private static string FormatDuration(TimeSpan duration)
+    {
+        return $"{duration.TotalMilliseconds:0} ms";
+    }
+
+    private static string FormatNullableBoolean(bool? value)
+    {
+        return value.HasValue ? value.Value.ToString().ToLowerInvariant() : "<unknown>";
+    }
+
+    private static string FormatValueOrPlaceholder(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "<none>" : value.Trim();
     }
 
     private static int GetExitCodeOrDefault(Process process)
@@ -384,6 +604,37 @@ public sealed class WaptBridgeMachineService
         {
             return -1;
         }
+    }
+
+    private sealed record BridgeMachinesCacheEntry(
+        List<WaptMachine> Machines,
+        string TechnicalDetails,
+        DateTimeOffset CreatedAtUtc);
+
+    public sealed record WaptBridgeMachinesResult(
+        List<WaptMachine> Machines,
+        string TechnicalDetails);
+
+    public sealed class WaptBridgeMachinesException : InvalidOperationException
+    {
+        public WaptBridgeMachinesException(string message, string technicalDetails, Exception? innerException = null)
+            : base(message, innerException)
+        {
+            TechnicalDetails = technicalDetails;
+        }
+
+        public string TechnicalDetails { get; }
+    }
+
+    private sealed class BridgeMachinesRequestException : Exception
+    {
+        public BridgeMachinesRequestException(string message, string technicalDetails, Exception? innerException = null)
+            : base(message, innerException)
+        {
+            TechnicalDetails = technicalDetails;
+        }
+
+        public string TechnicalDetails { get; }
     }
 
     private sealed class BridgeMachinesResponse

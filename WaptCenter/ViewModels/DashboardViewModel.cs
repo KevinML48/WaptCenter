@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -17,15 +18,26 @@ public partial class DashboardViewModel : ObservableObject
     private const string CompliantFilterValue = "Conforme";
     private const string UnknownFallbackFilterValue = "Inconnu / fallback";
     private const string NonCompliantFilterValue = "Non conforme";
+    private const string FullAnalysisModeValue = "Analyse complete";
+    private const string QuickAnalysisModeValue = "Analyse rapide (10 paquets)";
+    private const int QuickAnalysisPackageLimit = 10;
+    private const int MaxParallelPackageAnalyses = 2;
+    private const int RefreshBatchSize = 2;
 
     private readonly ConfigService _configService;
     private readonly WaptBridgePackageService _waptBridgePackageService;
     private readonly WaptBridgeMachineService _waptBridgeMachineService;
     private readonly List<PackageAnalysis> _allPackageAnalyses = [];
     private readonly Dictionary<string, MachineAggregate> _machineAggregates = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _machineCacheStatusCounts = new(StringComparer.OrdinalIgnoreCase);
     private readonly StringBuilder _technicalDetailsBuilder = new();
 
     private CancellationTokenSource? _loadDashboardCancellationTokenSource;
+    private bool _resetDashboardOnCancellation;
+    private int _pendingVisibleRefreshCount;
+    private int _successfulMachineLoadCount;
+    private int _emptySuccessfulMachineLoadCount;
+    private int _totalRawMachineRowsReturned;
 
     public DashboardViewModel(
         ConfigService configService,
@@ -40,6 +52,8 @@ public partial class DashboardViewModel : ObservableObject
         ComplianceFilters.Add(CompliantFilterValue);
         ComplianceFilters.Add(UnknownFallbackFilterValue);
         ComplianceFilters.Add(NonCompliantFilterValue);
+        AnalysisModes.Add(FullAnalysisModeValue);
+        AnalysisModes.Add(QuickAnalysisModeValue);
 
         ResetDashboardState(preserveFilters: false);
     }
@@ -51,6 +65,8 @@ public partial class DashboardViewModel : ObservableObject
     public ObservableCollection<string> AvailableOuFilters { get; } = [];
 
     public ObservableCollection<string> ComplianceFilters { get; } = [];
+
+    public ObservableCollection<string> AnalysisModes { get; } = [];
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RefreshDashboardCommand))]
@@ -73,6 +89,9 @@ public partial class DashboardViewModel : ObservableObject
 
     [ObservableProperty]
     private int totalPackageCount;
+
+    [ObservableProperty]
+    private int availablePackageCount;
 
     [ObservableProperty]
     private int analyzedPackageCount;
@@ -110,12 +129,35 @@ public partial class DashboardViewModel : ObservableObject
     [ObservableProperty]
     private string selectedComplianceFilter = AllComplianceFilterValue;
 
+    [ObservableProperty]
+    private string selectedAnalysisMode = FullAnalysisModeValue;
+
+    [ObservableProperty]
+    private string dashboardPackageLoadDurationMetric = "Duree paquets : -";
+
+    [ObservableProperty]
+    private string dashboardAnalysisDurationMetric = "Duree analyse dashboard : -";
+
+    [ObservableProperty]
+    private string dashboardPackageCacheStatusMetric = "Cache paquets : -";
+
+    [ObservableProperty]
+    private string dashboardMachineCacheStatusMetric = "Cache machines : -";
+
+    [ObservableProperty]
+    private string dashboardMachineCallStatusMetric = "Appels machines : -";
+
+    [ObservableProperty]
+    private string dashboardMachineReturnedRowsMetric = "Machines retournees : -";
+
     [RelayCommand(CanExecute = nameof(CanRefreshDashboard))]
     private async Task RefreshDashboardAsync()
     {
         CancelPendingLoad();
         ResetDashboardState();
+        _resetDashboardOnCancellation = false;
 
+        var totalStopwatch = Stopwatch.StartNew();
         var cancellationTokenSource = new CancellationTokenSource();
         _loadDashboardCancellationTokenSource = cancellationTokenSource;
         IsLoadingDashboard = true;
@@ -125,58 +167,95 @@ public partial class DashboardViewModel : ObservableObject
         try
         {
             var config = _configService.Load();
+            var packagesBridgeStopwatch = Stopwatch.StartNew();
             var packages = await _waptBridgePackageService.GetCd48PackagesAsync(config, cancellationTokenSource.Token);
+            packagesBridgeStopwatch.Stop();
+            DashboardPackageLoadDurationMetric = $"Duree chargement paquets : {FormatDuration(packagesBridgeStopwatch.Elapsed)}";
+            DashboardPackageCacheStatusMetric = $"Cache paquets : {FormatCacheStatus(ExtractTechnicalValue(_waptBridgePackageService.LastTechnicalDetails, "Cache status:"))}";
+
             var orderedPackages = packages
                 .OrderBy(packageItem => packageItem.PackageId, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            var packagesToAnalyze = SelectPackagesForAnalysis(orderedPackages);
 
-            TotalPackageCount = orderedPackages.Count;
+            AvailablePackageCount = orderedPackages.Count;
+            TotalPackageCount = packagesToAnalyze.Count;
             AppendTechnicalDetailsBlock("Packages bridge diagnostics", _waptBridgePackageService.LastTechnicalDetails);
-            AppendTechnicalDetailsLine($"Packages cd48 returned: {TotalPackageCount}");
-            ApplyDashboardFilters();
+            AppendTechnicalDetailsLine($"Packages cd48 returned: {AvailablePackageCount}");
+            AppendTechnicalDetailsLine($"Dashboard analysis mode: {SelectedAnalysisMode}");
+            AppendTechnicalDetailsLine($"Packages scheduled for analysis: {TotalPackageCount}");
+            AppendTechnicalDetailsLine($"Dashboard packages bridge duration: {FormatDuration(packagesBridgeStopwatch.Elapsed)}");
+            AppendTechnicalDetailsLine($"Dashboard max parallel analyses: {MaxParallelPackageAnalyses}");
+            AppendTechnicalDetailsLine($"Dashboard refresh batch size: {RefreshBatchSize}");
+            AppendTechnicalDetailsLine($"Dashboard machine service instance: {_waptBridgeMachineService.GetHashCode()}");
 
-            if (orderedPackages.Count == 0)
+            if (TotalPackageCount != AvailablePackageCount)
+            {
+                AppendTechnicalDetailsLine(
+                    $"Quick analysis limit applied: {TotalPackageCount}/{AvailablePackageCount} paquet(s) programmes.");
+            }
+
+            if (packagesToAnalyze.Count == 0)
             {
                 StatusMessage = "Aucun paquet cd48 n'a ete trouve pour alimenter le tableau de bord.";
                 CurrentPackageLabel = "Aucun paquet a analyser.";
                 return;
             }
 
-            foreach (var packageItem in orderedPackages)
+            var throttler = new SemaphoreSlim(MaxParallelPackageAnalyses, MaxParallelPackageAnalyses);
+            var pendingAnalyses = packagesToAnalyze
+                .Select(packageItem => AnalysePackageAsync(config, packageItem, throttler, cancellationTokenSource.Token))
+                .ToList();
+
+            while (pendingAnalyses.Count > 0)
             {
+                var completedAnalysisTask = await Task.WhenAny(pendingAnalyses);
+                pendingAnalyses.Remove(completedAnalysisTask);
+
                 cancellationTokenSource.Token.ThrowIfCancellationRequested();
 
-                CurrentPackageLabel = packageItem.PackageId;
-                StatusMessage =
-                    $"Analyse du paquet {AnalyzedPackageCount + 1}/{TotalPackageCount} : '{packageItem.PackageId}'...";
+                var analysisResult = await completedAnalysisTask;
+                RegisterPackageAnalysisResult(analysisResult);
 
-                await AnalysePackageAsync(config, packageItem, cancellationTokenSource.Token);
-
-                AnalyzedPackageCount++;
-                UpdateOuFilterOptions();
-                ApplyDashboardFilters();
-                RefreshGlobalCounters();
-                HasPackageSummaries = PackageSummaries.Count > 0;
-                HasOuSummaries = OuSummaries.Count > 0;
+                if (_pendingVisibleRefreshCount >= RefreshBatchSize || pendingAnalyses.Count == 0)
+                {
+                    FlushVisibleDashboardRefresh();
+                }
             }
+
+            totalStopwatch.Stop();
+            DashboardAnalysisDurationMetric = $"Duree analyse dashboard : {FormatDuration(totalStopwatch.Elapsed)}";
+            AppendTechnicalDetailsLine($"Dashboard total duration: {FormatDuration(totalStopwatch.Elapsed)}");
 
             CurrentPackageLabel = FailedPackageCount > 0
                 ? "Analyse terminee avec erreurs partielles."
                 : "Analyse terminee.";
-            StatusMessage = FailedPackageCount > 0
-                ? $"{AnalyzedPackageCount} paquet(s) cd48 analyses, dont {FailedPackageCount} avec erreur de chargement machines."
-                : $"{AnalyzedPackageCount} paquet(s) cd48 analyses pour le tableau de bord.";
+            StatusMessage = BuildDashboardCompletionMessage();
         }
         catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested)
         {
-            IsStatusError = false;
-            CurrentPackageLabel = "Analyse annulee.";
-            StatusMessage =
-                $"Chargement annule apres {AnalyzedPackageCount}/{TotalPackageCount} paquet(s) traites.";
-            AppendTechnicalDetailsLine("Dashboard load cancelled by user.");
+            totalStopwatch.Stop();
+            DashboardAnalysisDurationMetric = $"Duree analyse dashboard : {FormatDuration(totalStopwatch.Elapsed)}";
+
+            if (_resetDashboardOnCancellation)
+            {
+                ResetDashboardState();
+            }
+            else
+            {
+                FlushVisibleDashboardRefresh();
+                IsStatusError = false;
+                CurrentPackageLabel = "Analyse annulee.";
+                StatusMessage =
+                    $"Chargement annule apres {AnalyzedPackageCount}/{TotalPackageCount} paquet(s) programmes.";
+                AppendTechnicalDetailsLine($"Dashboard load cancelled by user after {FormatDuration(totalStopwatch.Elapsed)}.");
+            }
         }
         catch (InvalidOperationException exception)
         {
+            totalStopwatch.Stop();
+            DashboardAnalysisDurationMetric = $"Duree analyse dashboard : {FormatDuration(totalStopwatch.Elapsed)}";
+            FlushVisibleDashboardRefresh();
             IsStatusError = true;
             CurrentPackageLabel = "Analyse interrompue.";
             StatusMessage = exception.Message;
@@ -186,6 +265,9 @@ public partial class DashboardViewModel : ObservableObject
         }
         catch (Exception exception)
         {
+            totalStopwatch.Stop();
+            DashboardAnalysisDurationMetric = $"Duree analyse dashboard : {FormatDuration(totalStopwatch.Elapsed)}";
+            FlushVisibleDashboardRefresh();
             IsStatusError = true;
             CurrentPackageLabel = "Analyse interrompue.";
             StatusMessage = "Une erreur inattendue est survenue lors du chargement du tableau de bord.";
@@ -195,11 +277,15 @@ public partial class DashboardViewModel : ObservableObject
         }
         finally
         {
+            _pendingVisibleRefreshCount = 0;
+
             if (ReferenceEquals(_loadDashboardCancellationTokenSource, cancellationTokenSource))
             {
                 _loadDashboardCancellationTokenSource = null;
                 IsLoadingDashboard = false;
             }
+
+            _resetDashboardOnCancellation = false;
 
             cancellationTokenSource.Dispose();
         }
@@ -208,6 +294,15 @@ public partial class DashboardViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanCancelLoad))]
     private void CancelLoad()
     {
+        if (_loadDashboardCancellationTokenSource is null)
+        {
+            return;
+        }
+
+        _resetDashboardOnCancellation = true;
+        ResetDashboardState();
+        StatusMessage = "Annulation du tableau de bord en cours...";
+        CurrentPackageLabel = "Remise a zero en cours...";
         CancelPendingLoad();
     }
 
@@ -263,30 +358,60 @@ public partial class DashboardViewModel : ObservableObject
         ApplyDashboardFilters();
     }
 
-    private async Task AnalysePackageAsync(
+    private async Task<PackageAnalysisResult> AnalysePackageAsync(
         WaptConfig config,
         WaptPackage packageItem,
+        SemaphoreSlim throttler,
         CancellationToken cancellationToken)
     {
+        var totalStopwatch = Stopwatch.StartNew();
+
+        await throttler.WaitAsync(cancellationToken).ConfigureAwait(false);
+
         try
         {
-            var machines = await _waptBridgeMachineService.GetMachinesForPackageAsync(
+            var requestedPackageId = packageItem.PackageId;
+            var bridgeStopwatch = Stopwatch.StartNew();
+            var machineResult = await _waptBridgeMachineService.GetMachineResultForPackageAsync(
                 config,
-                packageItem.PackageId,
-                cancellationToken);
+                requestedPackageId,
+                cancellationToken).ConfigureAwait(false);
+            bridgeStopwatch.Stop();
 
+            var machines = machineResult.Machines;
+            var technicalDetails = machineResult.TechnicalDetails;
+            var rawMachineCount = machines.Count;
+            var machineLoadMessage = FirstNonEmpty(
+                ExtractTechnicalValue(technicalDetails, "Machine bridge response message:"),
+                rawMachineCount == 0
+                    ? "Bridge machines termine avec succes et liste machines vide."
+                    : $"Bridge machines termine avec succes, {rawMachineCount} machine(s) retournee(s).");
+            var machineStrategy = ResolveMachineStrategy(technicalDetails, machineLoadMessage);
+
+            var processingStopwatch = Stopwatch.StartNew();
             var uniqueMachines = DeduplicateMachines(machines).ToList();
-            _allPackageAnalyses.Add(new PackageAnalysis(packageItem, uniqueMachines));
+            var packageSummary = BuildPackageSummaryFromUniqueMachines(
+                packageItem,
+                uniqueMachines,
+                "OK",
+                machineStrategy,
+                machineLoadMessage);
+            processingStopwatch.Stop();
+            totalStopwatch.Stop();
 
-            var packageSummary = BuildPackageSummary(packageItem, uniqueMachines);
-            UpdateMachineAggregates(packageItem.PackageId, uniqueMachines);
-
-            AppendTechnicalDetailsLine(
-                $"[{packageItem.PackageId}] {packageSummary.MachineCount} machine(s), " +
-                $"{packageSummary.CompliantCount} conformes, " +
-                $"{packageSummary.UnknownCount} inconnues, " +
-                $"{packageSummary.NonCompliantCount} non conformes, " +
-                $"{packageSummary.DistinctOuCount} OU distinctes.");
+            return new PackageAnalysisResult(
+                packageItem,
+                uniqueMachines,
+                packageSummary,
+                technicalDetails,
+                rawMachineCount,
+                true,
+                machineStrategy,
+                machineLoadMessage,
+                bridgeStopwatch.Elapsed,
+                processingStopwatch.Elapsed,
+                totalStopwatch.Elapsed,
+                null);
         }
         catch (OperationCanceledException)
         {
@@ -294,14 +419,31 @@ public partial class DashboardViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            FailedPackageCount++;
-            _allPackageAnalyses.Add(new PackageAnalysis(packageItem, []));
-            AppendTechnicalDetailsLine($"[{packageItem.PackageId}] erreur: {exception.Message}");
-            AppendTechnicalDetailsBlock(
-                $"Machine bridge diagnostics - {packageItem.PackageId}",
-                string.IsNullOrWhiteSpace(_waptBridgeMachineService.LastTechnicalDetails)
-                    ? exception.ToString()
-                    : _waptBridgeMachineService.LastTechnicalDetails);
+            totalStopwatch.Stop();
+            var technicalDetails = exception is WaptBridgeMachineService.WaptBridgeMachinesException bridgeException &&
+                                   !string.IsNullOrWhiteSpace(bridgeException.TechnicalDetails)
+                ? bridgeException.TechnicalDetails
+                : string.IsNullOrWhiteSpace(_waptBridgeMachineService.LastTechnicalDetails)
+                ? exception.ToString()
+                : _waptBridgeMachineService.LastTechnicalDetails;
+
+            return new PackageAnalysisResult(
+                packageItem,
+                [],
+                null,
+                technicalDetails,
+                0,
+                false,
+                ResolveMachineStrategy(technicalDetails, exception.Message),
+                exception.Message,
+                TimeSpan.Zero,
+                TimeSpan.Zero,
+                totalStopwatch.Elapsed,
+                exception.Message);
+        }
+        finally
+        {
+            throttler.Release();
         }
     }
 
@@ -311,19 +453,33 @@ public partial class DashboardViewModel : ObservableObject
     {
         var uniqueMachines = DeduplicateMachines(machines).ToList();
 
+        return BuildPackageSummaryFromUniqueMachines(packageItem, uniqueMachines);
+    }
+
+    private static DashboardPackageSummary BuildPackageSummaryFromUniqueMachines(
+        WaptPackage packageItem,
+        IReadOnlyCollection<WaptMachine> uniqueMachines,
+        string machineLoadStatus = "OK",
+        string machineStrategy = "",
+        string machineLoadMessage = "")
+    {
         return new DashboardPackageSummary
         {
             PackageId = packageItem.PackageId,
             Name = packageItem.Name,
             Version = packageItem.Version,
             MachineCount = uniqueMachines.Count,
-            CompliantCount = uniqueMachines.Count(machine => machine.IsCompliant),
-            UnknownCount = uniqueMachines.Count(machine => machine.IsComplianceUnknown),
-            NonCompliantCount = uniqueMachines.Count(machine => machine.IsNonCompliant),
+            CompliantCount = uniqueMachines.Count(machine => string.Equals(machine.ComplianceStatus, WaptMachine.CompliantComplianceStatus, StringComparison.OrdinalIgnoreCase)),
+            UnknownCount = uniqueMachines.Count(machine => string.Equals(machine.ComplianceStatus, WaptMachine.UnknownComplianceStatus, StringComparison.OrdinalIgnoreCase) || (!machine.IsCompliant && !machine.IsNonCompliant)),
+            NonCompliantCount = uniqueMachines.Count(machine => string.Equals(machine.ComplianceStatus, WaptMachine.NonCompliantComplianceStatus, StringComparison.OrdinalIgnoreCase)),
             DistinctOuCount = uniqueMachines
                 .Select(ResolveOuDisplay)
+                .Where(ouDisplay => !string.IsNullOrWhiteSpace(ouDisplay))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Count()
+                .Count(),
+            MachineLoadStatus = machineLoadStatus,
+            MachineStrategy = machineStrategy,
+            MachineLoadMessage = machineLoadMessage
         };
     }
 
@@ -343,17 +499,25 @@ public partial class DashboardViewModel : ObservableObject
 
     private void ApplyDashboardFilters()
     {
+        var hasMachineLevelFilters = HasMachineLevelFilters();
         var filteredPackageAnalyses = _allPackageAnalyses
             .Where(PackageMatchesSearch)
             .Select(packageAnalysis => new FilteredPackageAnalysis(
                 packageAnalysis,
-                FilterMachines(packageAnalysis.Machines).ToList()))
+                hasMachineLevelFilters
+                    ? FilterMachines(packageAnalysis.Machines).ToList()
+                    : packageAnalysis.Machines))
             .Where(ShouldIncludePackageAnalysis)
             .OrderBy(result => result.Analysis.Package.PackageId, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         var visiblePackageSummaries = filteredPackageAnalyses
-            .Select(result => BuildPackageSummary(result.Analysis.Package, result.FilteredMachines))
+            .Select(result => BuildPackageSummaryFromUniqueMachines(
+                result.Analysis.Package,
+                result.FilteredMachines,
+                result.Analysis.MachineLoadStatus,
+                result.Analysis.MachineStrategy,
+                result.Analysis.MachineLoadMessage))
             .ToList();
 
         var visibleOuSummaries = BuildOuSummaries(filteredPackageAnalyses);
@@ -459,7 +623,7 @@ public partial class DashboardViewModel : ObservableObject
 
     private void UpdateMachineAggregates(string packageId, IEnumerable<WaptMachine> machines)
     {
-        foreach (var machine in DeduplicateMachines(machines))
+        foreach (var machine in machines)
         {
             var machineIdentity = BuildMachineIdentity(machine);
             if (!_machineAggregates.TryGetValue(machineIdentity, out var aggregate))
@@ -527,13 +691,19 @@ public partial class DashboardViewModel : ObservableObject
         OuSummaries.Clear();
         _allPackageAnalyses.Clear();
         _machineAggregates.Clear();
+        _machineCacheStatusCounts.Clear();
         _technicalDetailsBuilder.Clear();
+        _pendingVisibleRefreshCount = 0;
+        _successfulMachineLoadCount = 0;
+        _emptySuccessfulMachineLoadCount = 0;
+        _totalRawMachineRowsReturned = 0;
 
         StatusMessage = "Utilisez 'Actualiser le tableau de bord' pour charger une synthese globale des paquets cd48.";
         TechnicalDetails = string.Empty;
         IsStatusError = false;
         CurrentPackageLabel = "Aucun paquet en cours d'analyse.";
         TotalPackageCount = 0;
+        AvailablePackageCount = 0;
         AnalyzedPackageCount = 0;
         FailedPackageCount = 0;
         TotalMachineCount = 0;
@@ -543,6 +713,12 @@ public partial class DashboardViewModel : ObservableObject
         NonCompliantMachineCount = 0;
         HasPackageSummaries = false;
         HasOuSummaries = false;
+        DashboardPackageLoadDurationMetric = "Duree paquets : -";
+        DashboardAnalysisDurationMetric = "Duree analyse dashboard : -";
+        DashboardPackageCacheStatusMetric = "Cache paquets : -";
+        DashboardMachineCacheStatusMetric = "Cache machines : -";
+        DashboardMachineCallStatusMetric = "Appels machines : -";
+        DashboardMachineReturnedRowsMetric = "Machines retournees : -";
 
         AvailableOuFilters.Clear();
         AvailableOuFilters.Add(AllOuFilterValue);
@@ -566,8 +742,146 @@ public partial class DashboardViewModel : ObservableObject
         }
 
         _loadDashboardCancellationTokenSource.Cancel();
-        _loadDashboardCancellationTokenSource.Dispose();
-        _loadDashboardCancellationTokenSource = null;
+    }
+
+    private List<WaptPackage> SelectPackagesForAnalysis(IReadOnlyList<WaptPackage> orderedPackages)
+    {
+        if (string.Equals(SelectedAnalysisMode, QuickAnalysisModeValue, StringComparison.OrdinalIgnoreCase))
+        {
+            return orderedPackages.Take(QuickAnalysisPackageLimit).ToList();
+        }
+
+        return orderedPackages.ToList();
+    }
+
+    private void RegisterPackageAnalysisResult(PackageAnalysisResult analysisResult)
+    {
+        AnalyzedPackageCount++;
+        CurrentPackageLabel = analysisResult.Package.PackageId;
+
+        if (analysisResult.IsSuccess)
+        {
+            _successfulMachineLoadCount++;
+            _totalRawMachineRowsReturned += analysisResult.RawMachineCount;
+            if (analysisResult.RawMachineCount == 0)
+            {
+                _emptySuccessfulMachineLoadCount++;
+            }
+
+            _allPackageAnalyses.Add(new PackageAnalysis(
+                analysisResult.Package,
+                analysisResult.Machines,
+                analysisResult.MachineLoadSucceeded,
+                "OK",
+                analysisResult.MachineStrategy,
+                analysisResult.MachineLoadMessage));
+            UpdateMachineAggregates(analysisResult.Package.PackageId, analysisResult.Machines);
+
+            var packageSummary = analysisResult.Summary!;
+            var cacheStatus = NormalizeCacheStatus(ExtractTechnicalValue(analysisResult.TechnicalDetails, "Cache status:"));
+            RegisterMachineCacheStatus(cacheStatus);
+
+            AppendTechnicalDetailsLine(
+                $"[{analysisResult.Package.PackageId}] machine_call_success=true, package_id={analysisResult.Package.PackageId}, " +
+                $"raw_machines={analysisResult.RawMachineCount}, unique_machines={packageSummary.MachineCount}, " +
+                $"{packageSummary.CompliantCount} conformes, " +
+                $"{packageSummary.UnknownCount} inconnues, " +
+                $"{packageSummary.NonCompliantCount} non conformes, " +
+                $"{packageSummary.DistinctOuCount} OU distinctes, " +
+                $"strategy={FormatValueOrPlaceholder(analysisResult.MachineStrategy)}, " +
+                $"message={FormatValueOrPlaceholder(analysisResult.MachineLoadMessage)}, " +
+                $"cache={cacheStatus}, " +
+                $"bridge={FormatDuration(analysisResult.BridgeDuration)}, " +
+                $"traitement={FormatDuration(analysisResult.ProcessingDuration)}, " +
+                $"total={FormatDuration(analysisResult.TotalDuration)}.");
+        }
+        else
+        {
+            RegisterMachineCacheStatus(NormalizeCacheStatus(ExtractTechnicalValue(analysisResult.TechnicalDetails, "Cache status:")));
+            FailedPackageCount++;
+            _allPackageAnalyses.Add(new PackageAnalysis(
+                analysisResult.Package,
+                [],
+                analysisResult.MachineLoadSucceeded,
+                "Erreur",
+                analysisResult.MachineStrategy,
+                analysisResult.ErrorMessage ?? "Erreur machines sans message detaille."));
+            AppendTechnicalDetailsLine(
+                $"[{analysisResult.Package.PackageId}] machine_call_success=false, package_id={analysisResult.Package.PackageId}, " +
+                $"raw_machines=0, unique_machines=0, strategy={FormatValueOrPlaceholder(analysisResult.MachineStrategy)}, " +
+                $"erreur apres {FormatDuration(analysisResult.TotalDuration)}: {analysisResult.ErrorMessage}");
+            AppendTechnicalDetailsBlock(
+                $"Machine bridge diagnostics - {analysisResult.Package.PackageId}",
+                analysisResult.TechnicalDetails);
+        }
+
+        UpdateMachineCallMetrics();
+
+        _pendingVisibleRefreshCount++;
+        UpdateProgressStatus();
+    }
+
+    private void UpdateMachineCallMetrics()
+    {
+        DashboardMachineCallStatusMetric =
+            $"Appels machines : {_successfulMachineLoadCount} succes, {FailedPackageCount} erreur(s), {_emptySuccessfulMachineLoadCount} succes vide(s)";
+        DashboardMachineReturnedRowsMetric = $"Machines retournees brutes : {_totalRawMachineRowsReturned}";
+    }
+
+    private void RegisterMachineCacheStatus(string cacheStatus)
+    {
+        if (string.IsNullOrWhiteSpace(cacheStatus) || string.Equals(cacheStatus, "non disponible", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (!_machineCacheStatusCounts.TryAdd(cacheStatus, 1))
+        {
+            _machineCacheStatusCounts[cacheStatus]++;
+        }
+
+        DashboardMachineCacheStatusMetric = "Cache machines : " + string.Join(
+            ", ",
+            _machineCacheStatusCounts
+                .OrderBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(entry => $"{FormatCacheStatus(entry.Key)}={entry.Value}"));
+    }
+
+    private void FlushVisibleDashboardRefresh()
+    {
+        if (_pendingVisibleRefreshCount == 0)
+        {
+            return;
+        }
+
+        var refreshStopwatch = Stopwatch.StartNew();
+        RefreshGlobalCounters();
+        UpdateOuFilterOptions();
+        ApplyDashboardFilters();
+        refreshStopwatch.Stop();
+
+        AppendTechnicalDetailsLine(
+            $"Dashboard UI refresh after {AnalyzedPackageCount}/{TotalPackageCount} paquet(s): {FormatDuration(refreshStopwatch.Elapsed)}.");
+
+        _pendingVisibleRefreshCount = 0;
+    }
+
+    private void UpdateProgressStatus()
+    {
+        StatusMessage = FailedPackageCount > 0
+            ? $"{AnalyzedPackageCount}/{TotalPackageCount} paquet(s) programmes traites, {FailedPackageCount} erreur(s)."
+            : $"{AnalyzedPackageCount}/{TotalPackageCount} paquet(s) programmes traites.";
+    }
+
+    private string BuildDashboardCompletionMessage()
+    {
+        var scopeMessage = TotalPackageCount == AvailablePackageCount
+            ? $"{AnalyzedPackageCount} paquet(s) cd48 analyses pour le tableau de bord."
+            : $"{AnalyzedPackageCount} paquet(s) analyses en mode rapide sur {AvailablePackageCount} paquet(s) cd48 disponibles.";
+
+        return FailedPackageCount > 0
+            ? $"{scopeMessage} {FailedPackageCount} chargement(s) machines en erreur."
+            : scopeMessage;
     }
 
     private void AppendTechnicalDetailsLine(string line)
@@ -650,6 +964,101 @@ public partial class DashboardViewModel : ObservableObject
         return string.Empty;
     }
 
+    private static string? ExtractTechnicalValue(string? technicalDetails, string label)
+    {
+        if (string.IsNullOrWhiteSpace(technicalDetails))
+        {
+            return null;
+        }
+
+        foreach (var line in technicalDetails.Split(["\r\n", "\n"], StringSplitOptions.None))
+        {
+            if (!line.StartsWith(label, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return line[label.Length..].Trim();
+        }
+
+        return null;
+    }
+
+    private static string ResolveMachineStrategy(string? technicalDetails, string? machineLoadMessage)
+    {
+        var selectedStrategy = ExtractTechnicalValue(technicalDetails, "Selected strategy:");
+        if (!string.IsNullOrWhiteSpace(selectedStrategy))
+        {
+            return selectedStrategy;
+        }
+
+        var bridgeStrategy = ExtractTechnicalValue(technicalDetails, "Bridge strategy:");
+        var strategyLine = string.IsNullOrWhiteSpace(technicalDetails)
+            ? string.Empty
+            : technicalDetails
+                .Split(["\r\n", "\n"], StringSplitOptions.None)
+                .Select(line => line.Trim())
+                .FirstOrDefault(line => line.StartsWith("Strategy [", StringComparison.OrdinalIgnoreCase)) ?? string.Empty;
+
+        var derivedStrategy = DeriveMachineStrategyFromMessage(machineLoadMessage);
+
+        return FirstNonEmpty(derivedStrategy, strategyLine, bridgeStrategy);
+    }
+
+    private static string DeriveMachineStrategyFromMessage(string? machineLoadMessage)
+    {
+        if (string.IsNullOrWhiteSpace(machineLoadMessage))
+        {
+            return string.Empty;
+        }
+
+        if (machineLoadMessage.Contains("hosts_for_package", StringComparison.OrdinalIgnoreCase))
+        {
+            return "WaptServerHostsForPackageFallback";
+        }
+
+        if (machineLoadMessage.Contains("depends", StringComparison.OrdinalIgnoreCase))
+        {
+            return "WaptServerHostsDependsFallback";
+        }
+
+        if (machineLoadMessage.Contains("host_data", StringComparison.OrdinalIgnoreCase))
+        {
+            return "WaptServerHostDataInstalledPackagesFallback";
+        }
+
+        return string.Empty;
+    }
+
+    private static string NormalizeCacheStatus(string? cacheStatus)
+    {
+        return string.IsNullOrWhiteSpace(cacheStatus)
+            ? "non disponible"
+            : cacheStatus.Trim().ToLowerInvariant();
+    }
+
+    private static string FormatCacheStatus(string? cacheStatus)
+    {
+        return NormalizeCacheStatus(cacheStatus) switch
+        {
+            "memory-hit" => "hit memoire",
+            "memory-miss" => "miss memoire",
+            "shared-inflight" => "requete partagee",
+            "non disponible" => "non disponible",
+            var value => value
+        };
+    }
+
+    private static string FormatDuration(TimeSpan duration)
+    {
+        return $"{duration.TotalMilliseconds:0} ms";
+    }
+
+    private static string FormatValueOrPlaceholder(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "<none>" : value.Trim();
+    }
+
     private bool CanExportPackageSummaryCsv()
     {
         return !IsLoadingDashboard && PackageSummaries.Count > 0;
@@ -727,7 +1136,7 @@ public partial class DashboardViewModel : ObservableObject
     {
         var lines = new List<string>
         {
-            "PackageId;Nom;Version;Machines;Conformes;Inconnues;Non conformes;OU distinctes"
+            "PackageId;Nom;Version;Machines;Conformes;Inconnues;Non conformes;OU distinctes;Statut machines;Strategie machines;Message machines"
         };
 
         foreach (var summary in summaries)
@@ -741,7 +1150,10 @@ public partial class DashboardViewModel : ObservableObject
                 EscapeCsvValue(summary.CompliantCount.ToString()),
                 EscapeCsvValue(summary.UnknownCount.ToString()),
                 EscapeCsvValue(summary.NonCompliantCount.ToString()),
-                EscapeCsvValue(summary.DistinctOuCount.ToString())
+                EscapeCsvValue(summary.DistinctOuCount.ToString()),
+                EscapeCsvValue(summary.MachineLoadStatus),
+                EscapeCsvValue(summary.MachineStrategy),
+                EscapeCsvValue(summary.MachineLoadMessage)
             }));
         }
 
@@ -881,7 +1293,30 @@ public partial class DashboardViewModel : ObservableObject
         }
     }
 
-    private sealed record PackageAnalysis(WaptPackage Package, IReadOnlyList<WaptMachine> Machines);
+    private sealed record PackageAnalysis(
+        WaptPackage Package,
+        IReadOnlyList<WaptMachine> Machines,
+        bool MachineLoadSucceeded,
+        string MachineLoadStatus,
+        string MachineStrategy,
+        string MachineLoadMessage);
+
+    private sealed record PackageAnalysisResult(
+        WaptPackage Package,
+        IReadOnlyList<WaptMachine> Machines,
+        DashboardPackageSummary? Summary,
+        string TechnicalDetails,
+        int RawMachineCount,
+        bool MachineLoadSucceeded,
+        string MachineStrategy,
+        string MachineLoadMessage,
+        TimeSpan BridgeDuration,
+        TimeSpan ProcessingDuration,
+        TimeSpan TotalDuration,
+        string? ErrorMessage)
+    {
+        public bool IsSuccess => ErrorMessage is null;
+    }
 
     private sealed record FilteredPackageAnalysis(PackageAnalysis Analysis, IReadOnlyList<WaptMachine> FilteredMachines);
 
