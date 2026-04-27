@@ -5,6 +5,7 @@ namespace WaptCenter.ViewModels;
 
 public partial class MainViewModel : ObservableObject
 {
+    private readonly DashboardViewModel _dashboardViewModel;
     private readonly SettingsViewModel _settingsViewModel;
     private readonly PackagesViewModel _packagesViewModel;
 
@@ -17,16 +18,29 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string currentSectionDescription = string.Empty;
 
-    public MainViewModel(SettingsViewModel settingsViewModel, PackagesViewModel packagesViewModel)
+    public MainViewModel(
+        DashboardViewModel dashboardViewModel,
+        SettingsViewModel settingsViewModel,
+        PackagesViewModel packagesViewModel)
     {
+        _dashboardViewModel = dashboardViewModel;
         _settingsViewModel = settingsViewModel;
         _packagesViewModel = packagesViewModel;
         ShowSettings();
     }
 
     [RelayCommand]
+    private void ShowDashboard()
+    {
+        CurrentViewModel = _dashboardViewModel;
+        CurrentSectionTitle = "Tableau de bord cd48";
+        CurrentSectionDescription = "Chargez une synthese progressive des paquets cd48, des machines associees et des regroupements par OU sans quitter l'architecture bridge.";
+    }
+
+    [RelayCommand]
     private void ShowSettings()
     {
+        _dashboardViewModel.CancelLoading();
         CurrentViewModel = _settingsViewModel;
         CurrentSectionTitle = "Configuration locale";
         CurrentSectionDescription = "Renseignez les chemins et parametres utilises par le bridge Python WAPT pour valider le flux reel de chargement.";
@@ -35,6 +49,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void ShowPackages()
     {
+        _dashboardViewModel.CancelLoading();
         CurrentViewModel = _packagesViewModel;
         CurrentSectionTitle = "Paquets cd48";
         CurrentSectionDescription = "Chargez les paquets via le bridge WAPT puis selectionnez un package_id cd48 pour voir les machines associees.";

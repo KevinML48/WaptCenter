@@ -1,9 +1,16 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Win32;
+using System.Windows;
+using System.Windows.Data;
 using WaptCenter.Models;
 using WaptCenter.Services;
 
@@ -23,12 +30,19 @@ public partial class PackageDetailsViewModel : ObservableObject
     {
         _configService = configService;
         _waptBridgeMachineService = waptBridgeMachineService;
+
+        FilteredMachines = CollectionViewSource.GetDefaultView(Machines);
+        FilteredMachines.Filter = FilterMachine;
+        FilteredMachines.SortDescriptions.Add(new SortDescription(nameof(WaptMachine.OuPath), ListSortDirection.Ascending));
+        FilteredMachines.SortDescriptions.Add(new SortDescription(nameof(WaptMachine.OrganizationDisplay), ListSortDirection.Ascending));
+        FilteredMachines.SortDescriptions.Add(new SortDescription(nameof(WaptMachine.Hostname), ListSortDirection.Ascending));
+
         ClearSelection();
     }
 
     public ObservableCollection<WaptMachine> Machines { get; } = [];
 
-    public ObservableCollection<WaptMachine> FilteredMachines { get; } = [];
+    public ICollectionView FilteredMachines { get; }
 
     public ObservableCollection<string> AvailableOuFilters { get; } = [];
 
@@ -36,10 +50,12 @@ public partial class PackageDetailsViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ReloadCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ExportCsvCommand))]
     private bool isLoadingMachines;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ReloadCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ExportCsvCommand))]
     private WaptPackage? selectedPackage;
 
     [ObservableProperty]
@@ -90,23 +106,75 @@ public partial class PackageDetailsViewModel : ObservableObject
     [ObservableProperty]
     private int nonCompliantMachineCount;
 
+    [ObservableProperty]
+    private string machineLoadDurationMetric = "Duree machines : -";
+
+    [ObservableProperty]
+    private string machineCacheStatusMetric = "Cache machines : -";
+
     [RelayCommand(CanExecute = nameof(CanReload))]
     private async Task ReloadAsync()
     {
         await LoadForPackageAsync(SelectedPackage);
     }
 
+    [RelayCommand(CanExecute = nameof(CanExportCsv))]
+    private void ExportCsv()
+    {
+        var machinesToExport = GetVisibleMachines().ToList();
+        if (SelectedPackage is null || machinesToExport.Count == 0)
+        {
+            const string noMachineMessage = "Aucune machine visible n'est disponible pour l'export CSV.";
+            IsStatusError = true;
+            StatusMessage = noMachineMessage;
+            MessageBox.Show(noMachineMessage, "Exporter CSV", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var dialog = new SaveFileDialog
+        {
+            Title = "Exporter les machines affichees",
+            Filter = "CSV UTF-8 (*.csv)|*.csv|Tous les fichiers (*.*)|*.*",
+            DefaultExt = ".csv",
+            AddExtension = true,
+            FileName = BuildDefaultCsvFileName()
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            File.WriteAllText(dialog.FileName, BuildCsvContent(machinesToExport), new UTF8Encoding(true));
+
+            var successMessage =
+                $"{machinesToExport.Count} machine(s) visible(s) exportee(s) dans '{dialog.FileName}'.";
+            IsStatusError = false;
+            StatusMessage = successMessage;
+            MessageBox.Show(successMessage, "Exporter CSV", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception exception)
+        {
+            var errorMessage =
+                $"L'export CSV des machines visibles a echoue : {exception.Message}";
+            IsStatusError = true;
+            StatusMessage = errorMessage;
+            MessageBox.Show(errorMessage, "Exporter CSV", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     public void ClearSelection()
     {
         CancelPendingLoad();
-        Machines.Clear();
+        ReplaceMachines([]);
         SelectedPackage = null;
         SelectedPackageSummary = "Selectionnez un paquet cd48 pour charger les machines associees.";
         StatusMessage = "Selectionnez un paquet cd48 pour charger les machines associees.";
         TechnicalDetails = string.Empty;
         IsStatusError = false;
         HasMachines = false;
-        FilteredMachines.Clear();
         OuComplianceBreakdownLines.Clear();
         ResetOuFilters();
         MatchTypeWarningMessage = string.Empty;
@@ -118,16 +186,18 @@ public partial class PackageDetailsViewModel : ObservableObject
         CompliantMachineCount = 0;
         UnknownMachineCount = 0;
         NonCompliantMachineCount = 0;
+        MachineLoadDurationMetric = "Duree machines : -";
+        MachineCacheStatusMetric = "Cache machines : -";
         HasOnlyDependsFallbackMachines = false;
         IsLoadingMachines = false;
+        ExportCsvCommand.NotifyCanExecuteChanged();
     }
 
     public async Task LoadForPackageAsync(WaptPackage? package)
     {
         CancelPendingLoad();
         SelectedPackage = package;
-        Machines.Clear();
-        FilteredMachines.Clear();
+        ReplaceMachines([]);
         OuComplianceBreakdownLines.Clear();
         TechnicalDetails = string.Empty;
         IsStatusError = false;
@@ -142,6 +212,8 @@ public partial class PackageDetailsViewModel : ObservableObject
         CompliantMachineCount = 0;
         UnknownMachineCount = 0;
         NonCompliantMachineCount = 0;
+        MachineLoadDurationMetric = "Duree machines : -";
+        MachineCacheStatusMetric = "Cache machines : -";
         HasOnlyDependsFallbackMachines = false;
 
         if (package is null || string.IsNullOrWhiteSpace(package.PackageId))
@@ -151,6 +223,7 @@ public partial class PackageDetailsViewModel : ObservableObject
             MatchTypeSummaryMessage = string.Empty;
             ComplianceSummaryMessage = string.Empty;
             OuSummaryMessage = string.Empty;
+            ExportCsvCommand.NotifyCanExecuteChanged();
             return;
         }
 
@@ -164,25 +237,26 @@ public partial class PackageDetailsViewModel : ObservableObject
         try
         {
             var config = _configService.Load();
-            var machines = await _waptBridgeMachineService.GetMachinesForPackageAsync(
+            var loadStopwatch = Stopwatch.StartNew();
+            var machineResult = await _waptBridgeMachineService.GetMachineResultForPackageAsync(
                 config,
                 package.PackageId,
                 cancellationTokenSource.Token);
+            loadStopwatch.Stop();
 
             if (cancellationTokenSource.IsCancellationRequested)
             {
                 return;
             }
 
-            TechnicalDetails = _waptBridgeMachineService.LastTechnicalDetails;
+            var machines = machineResult.Machines;
+            TechnicalDetails = machineResult.TechnicalDetails;
+            MachineLoadDurationMetric = $"Duree chargement machines : {FormatDuration(loadStopwatch.Elapsed)}";
+            MachineCacheStatusMetric = $"Cache machines : {FormatCacheStatus(ExtractTechnicalValue(TechnicalDetails, "Cache status:"))}";
 
-            foreach (var machine in machines)
-            {
-                Machines.Add(machine);
-            }
-
+            ReplaceMachines(machines);
             UpdateOuFilterOptions(machines);
-            ApplyOuFilter();
+            RefreshFilteredMachinesAndAggregates();
             StatusMessage = HasMachines
                 ? $"{Machines.Count} machine(s) ont ete trouvees pour '{package.PackageId}'."
                 : $"Aucune machine n'a ete trouvee pour '{package.PackageId}'.";
@@ -207,6 +281,7 @@ public partial class PackageDetailsViewModel : ObservableObject
             TechnicalDetails = string.IsNullOrWhiteSpace(_waptBridgeMachineService.LastTechnicalDetails)
                 ? exception.ToString()
                 : _waptBridgeMachineService.LastTechnicalDetails;
+            MachineCacheStatusMetric = $"Cache machines : {FormatCacheStatus(ExtractTechnicalValue(TechnicalDetails, "Cache status:"))}";
         }
         catch (Exception exception)
         {
@@ -225,6 +300,7 @@ public partial class PackageDetailsViewModel : ObservableObject
             TechnicalDetails = string.IsNullOrWhiteSpace(_waptBridgeMachineService.LastTechnicalDetails)
                 ? exception.ToString()
                 : _waptBridgeMachineService.LastTechnicalDetails;
+            MachineCacheStatusMetric = $"Cache machines : {FormatCacheStatus(ExtractTechnicalValue(TechnicalDetails, "Cache status:"))}";
         }
         finally
         {
@@ -267,7 +343,7 @@ public partial class PackageDetailsViewModel : ObservableObject
 
     partial void OnSelectedOuFilterChanged(string value)
     {
-        ApplyOuFilter();
+        RefreshFilteredMachinesAndAggregates();
     }
 
     private void UpdateMatchTypeWarning(IReadOnlyCollection<WaptMachine> machines)
@@ -402,18 +478,14 @@ public partial class PackageDetailsViewModel : ObservableObject
 
     private void ApplyOuFilter()
     {
-        var filteredMachines = Machines
-            .Where(machine => IsAllOuFilterSelected() || string.Equals(machine.OuPath, SelectedOuFilter, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(machine => machine.OuPath, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(machine => machine.OrganizationDisplay, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(machine => machine.Hostname, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        RefreshFilteredMachinesAndAggregates();
+    }
 
-        FilteredMachines.Clear();
-        foreach (var machine in filteredMachines)
-        {
-            FilteredMachines.Add(machine);
-        }
+    private void RefreshFilteredMachinesAndAggregates()
+    {
+        FilteredMachines.Refresh();
+
+        var filteredMachines = GetVisibleMachines().ToList();
 
         HasMachines = filteredMachines.Count > 0;
         UpdateMatchTypeSummary(filteredMachines);
@@ -421,6 +493,111 @@ public partial class PackageDetailsViewModel : ObservableObject
         UpdateMatchTypeWarning(filteredMachines);
         UpdateOuSummary(filteredMachines);
         UpdateOuComplianceBreakdown(filteredMachines);
+        ExportCsvCommand.NotifyCanExecuteChanged();
+    }
+
+    private bool CanExportCsv()
+    {
+        return !IsLoadingMachines && SelectedPackage is not null && VisibleMachineCount > 0;
+    }
+
+    private void ReplaceMachines(IEnumerable<WaptMachine> machines)
+    {
+        using (FilteredMachines.DeferRefresh())
+        {
+            Machines.Clear();
+            foreach (var machine in machines)
+            {
+                Machines.Add(machine);
+            }
+        }
+    }
+
+    private bool FilterMachine(object item)
+    {
+        return item is WaptMachine machine &&
+               (IsAllOuFilterSelected() || string.Equals(machine.OuPath, SelectedOuFilter, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private IEnumerable<WaptMachine> GetVisibleMachines()
+    {
+        return FilteredMachines.Cast<WaptMachine>();
+    }
+
+    private string BuildDefaultCsvFileName()
+    {
+        var packageId = SanitizeFileNameSegment(SelectedPackage?.PackageId);
+        var filterLabel = IsAllOuFilterSelected() ? "all-ou" : SanitizeFileNameSegment(SelectedOuFilter);
+        var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+        return $"wapt-machines-{packageId}-{filterLabel}-{timestamp}.csv";
+    }
+
+    private static string BuildCsvContent(IReadOnlyCollection<WaptMachine> machines)
+    {
+        var lines = new List<string>
+        {
+            string.Join(";", new[]
+            {
+                "PackageId",
+                "Hostname",
+                "FQDN",
+                "OU / Organisation",
+                "Version installee",
+                "Type de correspondance",
+                "Statut conformite",
+                "Last seen",
+                "Etat hote"
+            })
+        };
+
+        foreach (var machine in machines)
+        {
+            lines.Add(string.Join(";", new[]
+            {
+                EscapeCsvValue(machine.PackageId),
+                EscapeCsvValue(machine.Hostname),
+                EscapeCsvValue(machine.Fqdn),
+                EscapeCsvValue(machine.OrganizationDisplay),
+                EscapeCsvValue(machine.InstalledVersion),
+                EscapeCsvValue(machine.MatchTypeDisplayLabel),
+                EscapeCsvValue(machine.ComplianceStatusDisplayLabel),
+                EscapeCsvValue(machine.LastSeen),
+                EscapeCsvValue(machine.Status)
+            }));
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private static string EscapeCsvValue(string? value)
+    {
+        var normalizedValue = value ?? string.Empty;
+        var requiresQuotes = normalizedValue.Contains(';') ||
+                             normalizedValue.Contains('"') ||
+                             normalizedValue.Contains('\r') ||
+                             normalizedValue.Contains('\n');
+
+        if (!requiresQuotes)
+        {
+            return normalizedValue;
+        }
+
+        return $"\"{normalizedValue.Replace("\"", "\"\"")}\"";
+    }
+
+    private static string SanitizeFileNameSegment(string? value)
+    {
+        var normalizedValue = string.IsNullOrWhiteSpace(value) ? "machines" : value.Trim();
+        var invalidCharacters = Path.GetInvalidFileNameChars();
+        var builder = new StringBuilder(normalizedValue.Length);
+
+        foreach (var character in normalizedValue)
+        {
+            builder.Append(invalidCharacters.Contains(character) || char.IsWhiteSpace(character) ? '-' : character);
+        }
+
+        var sanitizedValue = builder.ToString().Trim('-');
+        return string.IsNullOrWhiteSpace(sanitizedValue) ? "machines" : sanitizedValue;
     }
 
     private bool IsAllOuFilterSelected()
@@ -449,5 +626,42 @@ public partial class PackageDetailsViewModel : ObservableObject
         }
 
         return string.Join(", ", parts);
+    }
+
+    private static string? ExtractTechnicalValue(string? technicalDetails, string label)
+    {
+        if (string.IsNullOrWhiteSpace(technicalDetails))
+        {
+            return null;
+        }
+
+        foreach (var line in technicalDetails.Split(["\r\n", "\n"], StringSplitOptions.None))
+        {
+            if (!line.StartsWith(label, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return line[label.Length..].Trim();
+        }
+
+        return null;
+    }
+
+    private static string FormatCacheStatus(string? cacheStatus)
+    {
+        return cacheStatus?.Trim().ToLowerInvariant() switch
+        {
+            "memory-hit" => "hit memoire",
+            "memory-miss" => "miss memoire",
+            "shared-inflight" => "requete partagee",
+            null or "" => "non disponible",
+            var value => value
+        };
+    }
+
+    private static string FormatDuration(TimeSpan duration)
+    {
+        return $"{duration.TotalMilliseconds:0} ms";
     }
 }

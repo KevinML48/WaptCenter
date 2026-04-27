@@ -174,10 +174,102 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="PageCardBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#D9E0EA" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="Padding" Value="20" />
+            <Setter Property="Margin" Value="0,0,0,18" />
+        </Style>
+
+        <Style x:Key="PageCardTitleTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="#1D2940" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <Style x:Key="PageCardSubtitleTextStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,6,0,0" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="#5E6B84" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <Style x:Key="SummaryCardBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="#F7FBFF" />
+            <Setter Property="BorderBrush" Value="#D9E0EA" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="14" />
+            <Setter Property="Margin" Value="0,0,14,14" />
+            <Setter Property="Width" Value="280" />
+        </Style>
+
+        <Style x:Key="SummaryCardLabelTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#5E6B84" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <Style x:Key="SummaryCardValueTextStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,6,0,0" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="#1D2940" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <Style x:Key="PrimaryActionButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="40" />
+            <Setter Property="MinWidth" Value="190" />
+            <Setter Property="Padding" Value="18,10" />
+            <Setter Property="Background" Value="#1F5A9A" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+        </Style>
+
+        <Style x:Key="ReadableDataGridHeaderStyle" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#EEF4FA" />
+            <Setter Property="Foreground" Value="#1D2940" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="BorderBrush" Value="#D9E0EA" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+        </Style>
+
+        <Style x:Key="ReadableDataGridCellStyle" TargetType="DataGridCell">
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="ReadableDataGridRowStyle" TargetType="DataGridRow">
+            <Setter Property="MinHeight" Value="38" />
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Style.Triggers>
+                <Trigger Property="AlternationIndex" Value="1">
+                    <Setter Property="Background" Value="#FAFCFF" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="WrappingGridTextStyle" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
         <Style x:Key="ReadableDataGridStyle" TargetType="DataGrid">
+            <Setter Property="AutoGenerateColumns" Value="False" />
             <Setter Property="CanUserAddRows" Value="False" />
             <Setter Property="CanUserDeleteRows" Value="False" />
             <Setter Property="CanUserResizeColumns" Value="True" />
+            <Setter Property="CanUserResizeRows" Value="False" />
             <Setter Property="CanUserSortColumns" Value="True" />
             <Setter Property="IsReadOnly" Value="True" />
             <Setter Property="HeadersVisibility" Value="Column" />
@@ -185,324 +277,388 @@
             <Setter Property="GridLinesVisibility" Value="Horizontal" />
             <Setter Property="BorderBrush" Value="#D9E0EA" />
             <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="Foreground" Value="#1D2940" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="AlternationCount" Value="2" />
+            <Setter Property="RowStyle" Value="{StaticResource ReadableDataGridRowStyle}" />
+            <Setter Property="CellStyle" Value="{StaticResource ReadableDataGridCellStyle}" />
+            <Setter Property="ColumnHeaderStyle" Value="{StaticResource ReadableDataGridHeaderStyle}" />
             <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Visible" />
             <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
-            <Setter Property="MinRowHeight" Value="34" />
+            <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+            <Setter Property="EnableRowVirtualization" Value="True" />
+            <Setter Property="EnableColumnVirtualization" Value="True" />
+            <Setter Property="MinRowHeight" Value="38" />
         </Style>
     </UserControl.Resources>
 
-    <Grid Margin="18">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="2*" MinHeight="260" />
-            <RowDefinition Height="10" />
-            <RowDefinition Height="3*" MinHeight="360" />
-        </Grid.RowDefinitions>
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  CanContentScroll="False"
+                  Background="#F4F7FB"
+                  Padding="22">
+        <StackPanel>
+            <Border Style="{StaticResource PageCardBorderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2.2*" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
 
-        <Border Background="#FFFFFF"
-                BorderBrush="#D9E0EA"
-                BorderThickness="1"
-                CornerRadius="12"
-                Padding="20">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="2.2*" />
-                    <ColumnDefinition Width="1.3*" />
-                </Grid.ColumnDefinitions>
+                    <StackPanel Margin="0,0,24,0">
+                        <TextBlock Style="{StaticResource PageCardTitleTextStyle}"
+                                   Text="Inventaire des paquets cd48" />
+                        <TextBlock Style="{StaticResource PageCardSubtitleTextStyle}"
+                                   Text="Chargez les paquets via le bridge Python, sélectionnez un package_id, puis consultez les machines associées, leur conformité et leur répartition par OU dans une page lisible et scrollable." />
+                    </StackPanel>
 
-                <StackPanel Margin="0,0,24,0">
-                    <TextBlock Text="Paquets WAPT dont package_id contient cd48"
-                               FontSize="22"
-                               FontWeight="Bold"
-                               Foreground="#1D2940" />
-                    <TextBlock Text="Le chargement passe par un bridge Python qui s'appuie sur l'outillage WAPT local, retourne du JSON au desktop, puis conserve uniquement les paquets dont l'identifiant technique package_id contient cd48, sans filtrer sur le nom d'affichage."
-                               Margin="0,8,0,0"
-                               TextWrapping="Wrap"
-                               Foreground="#5E6B84"
-                               FontSize="13" />
+                    <StackPanel Grid.Column="1"
+                                HorizontalAlignment="Right">
+                        <Button Style="{StaticResource PrimaryActionButtonStyle}"
+                                Command="{Binding LoadPackagesCommand}"
+                                Content="Charger les paquets" />
+
+                        <ProgressBar Height="6"
+                                     Margin="0,14,0,0"
+                                     IsIndeterminate="True"
+                                     Style="{StaticResource PackagesProgressStyle}" />
+                    </StackPanel>
+
+                    <Grid Grid.Row="1"
+                          Grid.ColumnSpan="2"
+                          Margin="0,18,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.6*" />
+                            <ColumnDefinition Width="1*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Style="{StaticResource SummaryCardBorderStyle}"
+                                Width="Auto"
+                                Margin="0,0,14,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SummaryCardLabelTextStyle}"
+                                           Text="Résumé du chargement des paquets" />
+                                <TextBlock Margin="0,8,0,0"
+                                           Style="{StaticResource PackagesStatusTextStyle}"
+                                           Text="{Binding StatusMessage}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="1"
+                                Style="{StaticResource SummaryCardBorderStyle}"
+                                Width="Auto"
+                                Margin="0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SummaryCardLabelTextStyle}"
+                                           Text="Lecture de la page" />
+                                <TextBlock Style="{StaticResource SummaryCardValueTextStyle}"
+                                           Text="Les détails techniques restent repliés plus bas. La page se parcourt verticalement, tandis que chaque grille garde son propre scroll interne." />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource PageCardBorderStyle}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource PageCardTitleTextStyle}"
+                               Text="Liste des paquets" />
+                    <TextBlock Style="{StaticResource PageCardSubtitleTextStyle}"
+                               Text="Le tableau garde une grande zone de lecture, des colonnes redimensionnables et un scroll interne pour parcourir confortablement tous les résultats cd48." />
+
+                    <DataGrid Margin="0,18,0,0"
+                              Height="360"
+                              MinHeight="300"
+                              Style="{StaticResource ReadableDataGridStyle}"
+                              ItemsSource="{Binding Packages}"
+                              SelectedItem="{Binding SelectedPackage, Mode=TwoWay}"
+                              SelectionMode="Single"
+                              SelectionUnit="FullRow">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="PackageId" Binding="{Binding PackageId}" Width="2*" MinWidth="190" />
+                            <DataGridTextColumn Header="Nom" Binding="{Binding Name}" Width="1.5*" MinWidth="170" />
+                            <DataGridTextColumn Header="Version" Binding="{Binding Version}" Width="150" MinWidth="130" />
+                            <DataGridTextColumn Header="Maturité" Binding="{Binding Maturity}" Width="130" MinWidth="120" />
+                            <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="3.2*" MinWidth="320">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource WrappingGridTextStyle}" />
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
                 </StackPanel>
+            </Border>
 
-                <StackPanel Grid.Column="1">
-                    <Button Width="180"
-                            Height="40"
-                            Padding="18,10"
-                            HorizontalAlignment="Left"
-                            Background="#1F5A9A"
-                            BorderThickness="0"
-                            Foreground="White"
-                            FontWeight="SemiBold"
-                            Command="{Binding LoadPackagesCommand}"
-                            Content="Charger les paquets" />
+            <Border Style="{StaticResource PageCardBorderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
 
-                    <ProgressBar Height="6"
-                                 Margin="0,14,0,0"
+                    <StackPanel Margin="0,0,24,0">
+                        <TextBlock Style="{StaticResource PageCardTitleTextStyle}"
+                                   Text="Détail du paquet sélectionné" />
+                        <TextBlock Style="{StaticResource PageCardSubtitleTextStyle}"
+                                   Text="{Binding PackageDetails.SelectedPackageSummary}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1"
+                                HorizontalAlignment="Right"
+                                Width="320">
+                        <Button Style="{StaticResource PrimaryActionButtonStyle}"
+                                Command="{Binding PackageDetails.ReloadCommand}"
+                                Content="Recharger les machines" />
+
+                        <TextBlock Margin="0,14,0,0"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="#41546D"
+                                   Text="Filtrer par OU" />
+
+                        <ComboBox Height="38"
+                                  Margin="0,8,0,0"
+                                  ItemsSource="{Binding PackageDetails.AvailableOuFilters}"
+                                  SelectedItem="{Binding PackageDetails.SelectedOuFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+
+                    <ProgressBar Grid.Row="1"
+                                 Grid.ColumnSpan="2"
+                                 Height="6"
+                                 Margin="0,18,0,0"
                                  IsIndeterminate="True"
-                                 Style="{StaticResource PackagesProgressStyle}" />
+                                 Style="{StaticResource MachineDetailsProgressStyle}" />
 
-                    <TextBlock Margin="0,14,0,0"
-                               Style="{StaticResource PackagesStatusTextStyle}"
-                               Text="{Binding StatusMessage}" />
+                    <WrapPanel Grid.Row="2"
+                               Grid.ColumnSpan="2"
+                               Margin="0,18,0,0">
+                        <Border Style="{StaticResource SummaryCardBorderStyle}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SummaryCardLabelTextStyle}"
+                                           Text="État du chargement machines" />
+                                <TextBlock Margin="0,8,0,0"
+                                           Style="{StaticResource MachineDetailsStatusTextStyle}"
+                                           Text="{Binding PackageDetails.StatusMessage}" />
+                            </StackPanel>
+                        </Border>
 
-                    <Expander Header="Détails techniques"
+                        <Border>
+                            <Border.Style>
+                                <Style TargetType="Border" BasedOn="{StaticResource SummaryCardBorderStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding PackageDetails.ComplianceSummaryMessage}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SummaryCardLabelTextStyle}"
+                                           Text="Conformité" />
+                                <TextBlock Margin="0,8,0,0"
+                                           Style="{StaticResource MachineDetailsComplianceSummaryTextStyle}"
+                                           Text="{Binding PackageDetails.ComplianceSummaryMessage}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border>
+                            <Border.Style>
+                                <Style TargetType="Border" BasedOn="{StaticResource SummaryCardBorderStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding PackageDetails.MatchTypeSummaryMessage}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SummaryCardLabelTextStyle}"
+                                           Text="Type de correspondance" />
+                                <TextBlock Margin="0,8,0,0"
+                                           Style="{StaticResource MachineDetailsSummaryTextStyle}"
+                                           Text="{Binding PackageDetails.MatchTypeSummaryMessage}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border>
+                            <Border.Style>
+                                <Style TargetType="Border" BasedOn="{StaticResource SummaryCardBorderStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding PackageDetails.OuSummaryMessage}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SummaryCardLabelTextStyle}"
+                                           Text="Visibilité par OU" />
+                                <TextBlock Margin="0,8,0,0"
+                                           Style="{StaticResource MachineDetailsOuSummaryTextStyle}"
+                                           Text="{Binding PackageDetails.OuSummaryMessage}" />
+                            </StackPanel>
+                        </Border>
+                    </WrapPanel>
+
+                    <Border Grid.Row="3"
+                            Grid.ColumnSpan="2"
+                            Style="{StaticResource MachineDetailsWarningBorderStyle}">
+                        <TextBlock Foreground="#7A5608"
+                                   FontSize="13"
+                                   TextWrapping="Wrap"
+                                   Text="{Binding PackageDetails.MatchTypeWarningMessage}" />
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource PageCardBorderStyle}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource PageCardTitleTextStyle}"
+                               Text="Machines associées" />
+                    <TextBlock Style="{StaticResource PageCardSubtitleTextStyle}"
+                               Text="La grille machines garde une grande surface de lecture, des colonnes redimensionnables et un scroll horizontal si la largeur visible ne suffit pas." />
+
+                    <StackPanel Margin="0,16,0,0"
+                        Orientation="Horizontal">
+                    <Button Style="{StaticResource PrimaryActionButtonStyle}"
+                        Command="{Binding PackageDetails.ExportCsvCommand}"
+                        Content="Exporter CSV" />
+                    </StackPanel>
+
+                    <DataGrid Margin="0,18,0,0"
+                              Height="460"
+                              MinHeight="400"
+                              Style="{StaticResource ReadableDataGridStyle}"
+                              ItemsSource="{Binding PackageDetails.FilteredMachines}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Hostname" Binding="{Binding Hostname}" Width="1.2*" MinWidth="160" />
+                            <DataGridTextColumn Header="FQDN" Binding="{Binding Fqdn}" Width="1.7*" MinWidth="230" />
+                            <DataGridTextColumn Header="OU / Organisation" Binding="{Binding OrganizationDisplay}" Width="2.2*" MinWidth="300">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource WrappingGridTextStyle}" />
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Version installée" Binding="{Binding InstalledVersion}" Width="160" MinWidth="150" />
+                            <DataGridTextColumn Header="Type de correspondance" Binding="{Binding MatchTypeDisplayLabel}" Width="190" MinWidth="180" />
+                            <DataGridTemplateColumn Header="Statut conformité" Width="180" MinWidth="170">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Padding="10,4"
+                                                CornerRadius="10"
+                                                BorderThickness="1"
+                                                HorizontalAlignment="Left">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="#FFF1D9" />
+                                                    <Setter Property="BorderBrush" Value="#D7942D" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ComplianceStatus}" Value="compliant">
+                                                            <Setter Property="Background" Value="#E3F5E7" />
+                                                            <Setter Property="BorderBrush" Value="#5BA46B" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding ComplianceStatus}" Value="non_compliant">
+                                                            <Setter Property="Background" Value="#F9E1E1" />
+                                                            <Setter Property="BorderBrush" Value="#C45151" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock FontSize="12"
+                                                       FontWeight="SemiBold"
+                                                       Text="{Binding ComplianceStatusDisplayLabel}">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="#8A5A07" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding ComplianceStatus}" Value="compliant">
+                                                                <Setter Property="Foreground" Value="#215B34" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding ComplianceStatus}" Value="non_compliant">
+                                                                <Setter Property="Foreground" Value="#922F2F" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Last seen" Binding="{Binding LastSeen}" Width="180" MinWidth="170" />
+                            <DataGridTextColumn Header="Etat hôte" Binding="{Binding Status}" Width="150" MinWidth="140" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </StackPanel>
+            </Border>
+
+            <Border>
+                <Border.Style>
+                    <Style TargetType="Border" BasedOn="{StaticResource PageCardBorderStyle}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding PackageDetails.HasOuComplianceBreakdown}" Value="False">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource PageCardTitleTextStyle}"
+                               Text="Répartition par OU" />
+                    <TextBlock Style="{StaticResource PageCardSubtitleTextStyle}"
+                               Text="Cette section isole les regroupements par OU pour éviter de compresser les détails du paquet et la grille machines." />
+
+                    <Border Style="{StaticResource MachineDetailsOuBreakdownBorderStyle}"
+                            Margin="0,18,0,0">
+                        <ScrollViewer MaxHeight="260"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding PackageDetails.OuComplianceBreakdownLines}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Margin="0,0,0,8"
+                                                   Foreground="#41546D"
+                                                   FontSize="13"
+                                                   TextWrapping="Wrap"
+                                                   Text="{Binding}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource PageCardBorderStyle}" Margin="0">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource PageCardTitleTextStyle}"
+                               Text="Détails techniques" />
+                    <TextBlock Style="{StaticResource PageCardSubtitleTextStyle}"
+                               Text="Les diagnostics restent disponibles sans occuper l’espace principal. Chaque section reste fermée par défaut et ne s’ouvre qu’en cas de besoin." />
+
+                    <Expander Header="Chargement des paquets"
                               Style="{StaticResource PackagesTechnicalDetailsExpanderStyle}">
                         <TextBox Style="{StaticResource PackagesTechnicalDetailsStyle}"
                                  Text="{Binding TechnicalDetails}" />
                     </Expander>
+
+                    <Expander Header="Chargement des machines"
+                              Style="{StaticResource MachineDetailsTechnicalDetailsExpanderStyle}">
+                        <TextBox Style="{StaticResource MachineDetailsTechnicalDetailsStyle}"
+                                 Text="{Binding PackageDetails.TechnicalDetails}" />
+                    </Expander>
                 </StackPanel>
-            </Grid>
-        </Border>
-
-        <Border Grid.Row="1"
-                Margin="0,18,0,0"
-                Background="#FFFFFF"
-                BorderBrush="#D9E0EA"
-                BorderThickness="1"
-                CornerRadius="12"
-                Padding="16">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <StackPanel>
-                    <TextBlock Text="Liste des paquets"
-                               FontSize="18"
-                               FontWeight="Bold"
-                               Foreground="#1D2940" />
-                    <TextBlock Margin="0,4,0,0"
-                               Text="Sélectionnez un paquet pour afficher les machines associées et les résumés d'inventaire."
-                               Foreground="#5E6B84"
-                               FontSize="13"
-                               TextWrapping="Wrap" />
-                </StackPanel>
-
-                <DataGrid Grid.Row="1"
-                          Margin="0,14,0,0"
-                          MinHeight="240"
-                          Style="{StaticResource ReadableDataGridStyle}"
-                          ItemsSource="{Binding Packages}"
-                          SelectedItem="{Binding SelectedPackage, Mode=TwoWay}"
-                          SelectionMode="Single"
-                          SelectionUnit="FullRow">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="PackageId" Binding="{Binding PackageId}" Width="2*" MinWidth="180" />
-                        <DataGridTextColumn Header="Nom" Binding="{Binding Name}" Width="1.4*" MinWidth="160" />
-                        <DataGridTextColumn Header="Version" Binding="{Binding Version}" Width="140" MinWidth="120" />
-                        <DataGridTextColumn Header="Maturité" Binding="{Binding Maturity}" Width="120" MinWidth="110" />
-                        <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="3*" MinWidth="280">
-                            <DataGridTextColumn.ElementStyle>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-                                </Style>
-                            </DataGridTextColumn.ElementStyle>
-                        </DataGridTextColumn>
-                    </DataGrid.Columns>
-                </DataGrid>
-            </Grid>
-        </Border>
-
-        <GridSplitter Grid.Row="2"
-                      HorizontalAlignment="Stretch"
-                      VerticalAlignment="Stretch"
-                      Background="#E7EDF5"
-                      ResizeDirection="Rows"
-                      ResizeBehavior="PreviousAndNext"
-                      ShowsPreview="True" />
-
-        <Border Grid.Row="3"
-                Margin="0,18,0,0"
-                Background="#FFFFFF"
-                BorderBrush="#D9E0EA"
-                BorderThickness="1"
-                CornerRadius="12"
-                Padding="18">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="2*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel Margin="0,0,24,0">
-                        <TextBlock Text="Machines associées au paquet sélectionné"
-                                   FontSize="18"
-                                   FontWeight="Bold"
-                                   Foreground="#1D2940" />
-                        <TextBlock Margin="0,6,0,0"
-                                   Text="{Binding PackageDetails.SelectedPackageSummary}"
-                                   Foreground="#5E6B84"
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
-
-                    <WrapPanel Grid.Column="1"
-                               HorizontalAlignment="Right"
-                               VerticalAlignment="Top"
-                               Margin="24,0,0,0">
-                        <Button Width="190"
-                                Height="38"
-                                Padding="16,8"
-                                Background="#255C8D"
-                                BorderThickness="0"
-                                Foreground="White"
-                                FontWeight="SemiBold"
-                                Command="{Binding PackageDetails.ReloadCommand}"
-                                Content="Recharger les machines" />
-
-                        <TextBlock Margin="18,10,8,0"
-                                   VerticalAlignment="Center"
-                                   Foreground="#41546D"
-                                   FontSize="13"
-                                   FontWeight="SemiBold"
-                                   Text="Filtrer par OU" />
-
-                        <ComboBox Width="320"
-                                  Height="38"
-                                  ItemsSource="{Binding PackageDetails.AvailableOuFilters}"
-                                  SelectedItem="{Binding PackageDetails.SelectedOuFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                    </WrapPanel>
-                </Grid>
-
-                <ProgressBar Grid.Row="1"
-                             Height="6"
-                             Margin="0,16,0,0"
-                             IsIndeterminate="True"
-                             Style="{StaticResource MachineDetailsProgressStyle}" />
-
-                <Grid Grid.Row="2" Margin="0,16,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1.4*" />
-                        <ColumnDefinition Width="1*" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0" Margin="0,0,18,0">
-                        <TextBlock Style="{StaticResource MachineDetailsStatusTextStyle}"
-                                   Text="{Binding PackageDetails.StatusMessage}" />
-
-                        <TextBlock Style="{StaticResource MachineDetailsComplianceSummaryTextStyle}"
-                                   Text="{Binding PackageDetails.ComplianceSummaryMessage}" />
-
-                        <TextBlock Style="{StaticResource MachineDetailsSummaryTextStyle}"
-                                   Text="{Binding PackageDetails.MatchTypeSummaryMessage}" />
-
-                        <TextBlock Style="{StaticResource MachineDetailsOuSummaryTextStyle}"
-                                   Text="{Binding PackageDetails.OuSummaryMessage}" />
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="1">
-                        <Border Style="{StaticResource MachineDetailsOuBreakdownBorderStyle}" Margin="0">
-                            <StackPanel>
-                                <TextBlock Text="Répartition par OU"
-                                           Foreground="#1D2940"
-                                           FontSize="13"
-                                           FontWeight="SemiBold" />
-                                <ScrollViewer MaxHeight="120"
-                                              Margin="0,6,0,0"
-                                              VerticalScrollBarVisibility="Auto"
-                                              HorizontalScrollBarVisibility="Disabled">
-                                    <ItemsControl ItemsSource="{Binding PackageDetails.OuComplianceBreakdownLines}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Margin="0,0,0,6"
-                                                           Foreground="#41546D"
-                                                           FontSize="12"
-                                                           TextWrapping="Wrap"
-                                                           Text="{Binding}" />
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Style="{StaticResource MachineDetailsWarningBorderStyle}">
-                            <TextBlock Foreground="#7A5608"
-                                       FontSize="13"
-                                       TextWrapping="Wrap"
-                                       Text="{Binding PackageDetails.MatchTypeWarningMessage}" />
-                        </Border>
-
-                        <Expander Header="Détails techniques"
-                                  Style="{StaticResource MachineDetailsTechnicalDetailsExpanderStyle}">
-                            <TextBox Style="{StaticResource MachineDetailsTechnicalDetailsStyle}"
-                                     Text="{Binding PackageDetails.TechnicalDetails}" />
-                        </Expander>
-                    </StackPanel>
-                </Grid>
-
-                <DataGrid Grid.Row="3"
-                          Margin="0,18,0,0"
-                          MinHeight="300"
-                          Style="{StaticResource ReadableDataGridStyle}"
-                          ItemsSource="{Binding PackageDetails.FilteredMachines}">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Hostname" Binding="{Binding Hostname}" Width="1.2*" MinWidth="150" />
-                        <DataGridTextColumn Header="FQDN" Binding="{Binding Fqdn}" Width="1.6*" MinWidth="220" />
-                        <DataGridTextColumn Header="OU / Organisation" Binding="{Binding OrganizationDisplay}" Width="2*" MinWidth="260">
-                            <DataGridTextColumn.ElementStyle>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-                                </Style>
-                            </DataGridTextColumn.ElementStyle>
-                        </DataGridTextColumn>
-                        <DataGridTextColumn Header="Version installée" Binding="{Binding InstalledVersion}" Width="150" MinWidth="140" />
-                        <DataGridTextColumn Header="Type de correspondance" Binding="{Binding MatchTypeDisplayLabel}" Width="180" MinWidth="170" />
-                        <DataGridTemplateColumn Header="Statut conformité" Width="170" MinWidth="160">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <Border Padding="10,4"
-                                            CornerRadius="10"
-                                            BorderThickness="1"
-                                            HorizontalAlignment="Left">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="Background" Value="#FFF1D9" />
-                                                <Setter Property="BorderBrush" Value="#D7942D" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding ComplianceStatus}" Value="compliant">
-                                                        <Setter Property="Background" Value="#E3F5E7" />
-                                                        <Setter Property="BorderBrush" Value="#5BA46B" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding ComplianceStatus}" Value="non_compliant">
-                                                        <Setter Property="Background" Value="#F9E1E1" />
-                                                        <Setter Property="BorderBrush" Value="#C45151" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                        <TextBlock FontSize="12"
-                                                   FontWeight="SemiBold"
-                                                   Text="{Binding ComplianceStatusDisplayLabel}">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Foreground" Value="#8A5A07" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding ComplianceStatus}" Value="compliant">
-                                                            <Setter Property="Foreground" Value="#215B34" />
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding ComplianceStatus}" Value="non_compliant">
-                                                            <Setter Property="Foreground" Value="#922F2F" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
-                                    </Border>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                        <DataGridTextColumn Header="Last seen" Binding="{Binding LastSeen}" Width="170" MinWidth="160" />
-                        <DataGridTextColumn Header="Etat hôte" Binding="{Binding Status}" Width="140" MinWidth="130" />
-                    </DataGrid.Columns>
-                </DataGrid>
-            </Grid>
-        </Border>
-    </Grid>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>
